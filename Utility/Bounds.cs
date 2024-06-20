@@ -1,8 +1,4 @@
 ﻿using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
 using VirtualMeshCreator.Math;
 
 namespace VirtualMeshCreator.Utility
@@ -18,39 +14,49 @@ namespace VirtualMeshCreator.Utility
         {
             this.center = center;
             this.extends = extends;
-            this.Min = Vector3.zero;
-            this.Max = Vector3.one;
+            Min = Vector3.zero;
+            Max = Vector3.one;
         }
 
-        public static Bounds operator+(Bounds a, Bounds b)
+        public static Bounds operator +(Bounds a, Bounds b)
         {
-            Bounds bounds = new Bounds();
-            bounds.Min = new Vector3(
-                System.Math.Min(a.Min.x, b.Min.x),
-                System.Math.Min(a.Min.y, b.Min.y),
-                System.Math.Min(a.Min.z, b.Min.z)
-            );
-            bounds.Max = new Vector3(
-                System.Math.Max(a.Max.x, b.Max.x),
-                System.Math.Max(a.Max.y, b.Max.y),
-                System.Math.Max(a.Max.z, b.Max.z)
-            );
+            Bounds bounds = new Bounds
+            {
+                Min = new Vector3
+                (
+                    System.Math.Min(a.Min.x, b.Min.x),
+                    System.Math.Min(a.Min.y, b.Min.y),
+                    System.Math.Min(a.Min.z, b.Min.z)
+                ),
+
+                Max = new Vector3
+                (
+                    System.Math.Max(a.Max.x, b.Max.x),
+                    System.Math.Max(a.Max.y, b.Max.y),
+                    System.Math.Max(a.Max.z, b.Max.z)
+                )
+            };
             return bounds;
         }
 
         public static Bounds operator +(Bounds a, Vector3 b)
         {
-            Bounds bounds = new Bounds();
-            bounds.Min = new Vector3(
-                System.Math.Min(a.Min.x, b.x),
-                System.Math.Min(a.Min.y, b.y),
-                System.Math.Min(a.Min.z, b.z)
-            );
-            bounds.Max = new Vector3(
-                System.Math.Max(a.Max.x, b.x),
-                System.Math.Max(a.Max.y, b.y),
-                System.Math.Max(a.Max.z, b.z)
-            );
+            Bounds bounds = new Bounds
+            {
+                Min = new Vector3
+                (
+                    System.Math.Min(a.Min.x, b.x),
+                    System.Math.Min(a.Min.y, b.y),
+                    System.Math.Min(a.Min.z, b.z)
+                ),
+
+                Max = new Vector3
+                (
+                    System.Math.Max(a.Max.x, b.x),
+                    System.Math.Max(a.Max.y, b.y),
+                    System.Math.Max(a.Max.z, b.z)
+                )
+            };
             return bounds;
         }
     }
@@ -112,6 +118,7 @@ namespace VirtualMeshCreator.Utility
             {
                 float len = (points[i] - sphere.center).magnitude;
                 //assert(len - 1e-6 <= sphere.radius);
+                Console.WriteLine(len - 1e-6f <= sphere.radius);
             }
             return sphere;
         }
@@ -151,6 +158,7 @@ namespace VirtualMeshCreator.Utility
                 float t1 = (float)System.Math.Sqrt(sphere.radius - spheres[i].radius);
                 float t2 = (sphere.center - spheres[i].center).magnitudeSqr;
                 //assert(t1 + 1e-6f >= t2);
+                Console.WriteLine(t1 + 1e-6f >= t2);
             }
             return sphere;
         }

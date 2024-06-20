@@ -67,6 +67,7 @@
     <Compile Include="Utility\ArrayUtils.cs" />
     <Compile Include="Utility\Bounds.cs" />
     <Compile Include="Utility\HashTable.cs" />
+    <Compile Include="Utility\MathUtil.cs" />
     <Compile Include="Utility\MeshUtility.cs" />
     <Compile Include="Utility\Pair.cs" />
     <Compile Include="VMesh\Cluster.cs" />

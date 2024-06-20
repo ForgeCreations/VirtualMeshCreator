@@ -109,11 +109,11 @@ namespace VirtualMeshCreator.VMesh
             num_tri = num_index / 3;
             verts = vertices;
             indexes = triangles;
-            vert_ht = new HashTable(1 << System.Math.Min(16, (int)System.Math.Floor(System.Math.Log(num_vert, 2.0))));
+            vert_ht = new HashTable((uint)(1 << System.Math.Min(16, (int)System.Math.Floor(System.Math.Log(num_vert, 2.0)))));
             //vert_ht = new HashTable(num_vert);
             vert_refs = new int[num_vert];
             Array.Clear(vert_refs, 0, num_vert);
-            corner_ht = new HashTable(1 << System.Math.Min(16, (int)System.Math.Floor(System.Math.Log(num_index, 2.0))));
+            corner_ht = new HashTable((uint)(1 << System.Math.Min(16, (int)System.Math.Floor(System.Math.Log(num_index, 2.0)))));
             //corner_ht = new HashTable(num_index);
             tri_removed = new BitArray(num_tri);
             flags = new int[num_index];
@@ -125,13 +125,13 @@ namespace VirtualMeshCreator.VMesh
                 vert_ht.Add(MeshUtility.hash(verts[i]), i);
             }
 
-            int exp_num_edge = System.Math.Min(System.Math.Min(num_index, 3 * num_vert - 6), num_tri + num_vert);
-            Console.WriteLine("Num Edges: " + exp_num_edge);
-            edges = new List<(Vector3, Vector3)>(exp_num_edge);
-            edge0_ht = new HashTable(exp_num_edge);
-            edge0_ht.Clear((uint)(1 << System.Math.Min(16, (int)System.Math.Floor(System.Math.Log(exp_num_edge, 2.0)))), (uint)exp_num_edge);
-            edge1_ht = new HashTable(exp_num_edge);
-            edge1_ht.Clear((uint)(1 << System.Math.Min(16, (int)System.Math.Floor(System.Math.Log(exp_num_edge, 2.0)))), (uint)exp_num_edge);
+            uint NumEdges = MathUtil.Min3((uint)num_index, (uint)(3 * num_vert - 6), (uint)(num_tri + num_vert));
+            Console.WriteLine("Num Edges: " + NumEdges);
+            edges = new List<(Vector3, Vector3)>((int)NumEdges);
+            edge0_ht = new HashTable(NumEdges);
+            edge0_ht.Clear((uint)(1 << System.Math.Min(16, (int)System.Math.Floor(System.Math.Log(NumEdges, 2.0)))), NumEdges);
+            edge1_ht = new HashTable(NumEdges);
+            edge1_ht.Clear((uint)(1 << System.Math.Min(16, (int)System.Math.Floor(System.Math.Log(NumEdges, 2.0)))), NumEdges);
 
             for(uint corner = 0u; corner < num_index; corner++)
             {
@@ -140,6 +140,7 @@ namespace VirtualMeshCreator.VMesh
                 Vector3 p = verts[vertIndex];
                 corner_ht.Add(MeshUtility.hash(p), corner);
                 (Vector3, Vector3) vPair = (p, verts[indexes[MeshUtility.cycle3(corner)]]);
+                Console.WriteLine("Edge Count: " + edges.Count);
                 if(AddEdgeht(vPair.Item1, vPair.Item2, (uint)edges.Count))
                 {
                     edges.Add(vPair);
@@ -157,16 +158,14 @@ namespace VirtualMeshCreator.VMesh
                 ArrayUtils.Swap(p0, p1);
             }
 
-            /*uint OtherPairIndex;
+            uint OtherPairIndex;
             for(OtherPairIndex = edge0_ht.First(h0); edge0_ht.IsValid(OtherPairIndex); OtherPairIndex = edge0_ht.Next(OtherPairIndex))
             {
-                Console.WriteLine(index != OtherPairIndex);
-                if(index == OtherPairIndex)
-                    return false;
+                //Console.WriteLine(index != OtherPairIndex);
                 (Vector3, Vector3) OtherPair = edges[(int)OtherPairIndex];
                 if(p0 == OtherPair.Item1 && p1 == OtherPair.Item2)
                     return false; // Found a duplicate
-            }*/
+            }
             edge0_ht.Add(h0, index);
             edge1_ht.Add(h1, index);
             return true;
@@ -410,7 +409,6 @@ namespace VirtualMeshCreator.VMesh
             Array.Resize(ref tri_quadrics, num_tri);
             for(int i = 0; i < num_tri; i++)
             {
-                Console.WriteLine("Fixing Up Triangle [Triangle Index]: " + i);
                 FixupTriangle(i);
             }
 

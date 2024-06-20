@@ -147,7 +147,7 @@ namespace VirtualMeshCreator.VMesh
             Sphere parent_lod_bound = Sphere.FromSpheres(lod_bounds, lod_bounds.Length);
 
             MeshSimplifier simplifier = new MeshSimplifier(pos, pos.Length, idx, idx.Length);
-            HashTable edge_ht = new HashTable(group.externalEdges.Length);
+            HashTable edge_ht = new HashTable((uint)group.externalEdges.Length);
             uint i = 0;
 
             foreach(Pair<uint, uint> kv in group.externalEdges)
@@ -155,7 +155,7 @@ namespace VirtualMeshCreator.VMesh
                 Vector3[] poses = clusters[kv.Key].vertices;
                 int[] idxes = clusters[kv.Key].triangles;
                 Vector3 p0 = pos[idx[kv.Value]], p1 = pos[idx[MeshUtility.cycle3(kv.Value)]];
-                edge_ht.Add(MeshUtility.hash(new KeyValuePair<Vector3, Vector3>(p0, p1)), i);
+                edge_ht.Add(MeshUtility.hash((p0, p1)), i);
                 simplifier.LockPostition(p0);
                 simplifier.LockPostition(p1);
                 i++;
@@ -206,7 +206,7 @@ namespace VirtualMeshCreator.VMesh
                         Vector3 p0 = pos[v_idx], p1 = pos[idx[MeshUtility.cycle3(e_idx)]];
                         if(!is_external)
                         {
-                            uint pI = MeshUtility.hash(new KeyValuePair<Vector3, Vector3>(p0, p1));
+                            uint pI = MeshUtility.hash((p0, p1));
                             for(uint j = edge_ht.First(pI); edge_ht.IsValid(j); edge_ht.Next(j))
                             {
                                 Pair<uint, uint> ce = group.externalEdges[j];
@@ -235,7 +235,7 @@ namespace VirtualMeshCreator.VMesh
                 cluster.lodError = max_parent_lod_error;
                 cluster.boxBounds.center = cluster.vertices[0];
                 foreach(Vector3 p in cluster.vertices)
-                    cluster.boxBounds = cluster.boxBounds + p;
+                    cluster.boxBounds += p;
             }
             group.lodBounds = parent_lod_bound;
             group.maxParentLODError = max_parent_lod_error;

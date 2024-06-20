@@ -10,18 +10,18 @@ namespace VirtualMeshCreator.Utility
         private uint[] hash;
         private uint[] next_index;
 
-        public HashTable(int indexSize = 0)
+        public HashTable(uint indexSize = 0)
         {
             hash = null;
             next_index = null;
-            Resize((uint)indexSize, indexSize);
+            Resize(indexSize, indexSize);
         }
 
-        public HashTable(int hashSize, int indexSize)
+        public HashTable(uint hashSize, uint indexSize)
         {
             hash = null;
             next_index = null;
-            Resize((uint)hashSize, indexSize);
+            Resize(hashSize, indexSize);
         }
 
         private void ResizeIndex(uint _index_size)
@@ -36,7 +36,7 @@ namespace VirtualMeshCreator.Utility
             ResizeIndex(MeshUtility.lower_nearest_2_power(indexSize));
         }
 
-        public void Resize(uint hashSize, int indexSize)
+        public void Resize(uint hashSize, uint indexSize)
         {
             Dispose();
             Console.WriteLine((hash_size & (hash_size - 1)) == 0);
@@ -112,6 +112,7 @@ namespace VirtualMeshCreator.Utility
             //check(HashSize > 0);
             Console.WriteLine(hash_size > 0);
             //check(FMath::IsPowerOfTwo(HashSize));
+            Console.WriteLine(MathUtil.IsPowerOfTwo(hash_size));
 
             if(index_size > 0)
             {
