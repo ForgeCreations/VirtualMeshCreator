@@ -1,4 +1,5 @@
 ﻿using System;
+using VirtualMeshCreator.Math;
 
 namespace VirtualMeshCreator.Utility
 {

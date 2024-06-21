@@ -67,6 +67,7 @@
     <Compile Include="Utility\ArrayUtils.cs" />
     <Compile Include="Utility\Bounds.cs" />
     <Compile Include="Utility\HashTable.cs" />
+    <Compile Include="Utility\LRUCache.cs" />
     <Compile Include="Utility\MathUtil.cs" />
     <Compile Include="Utility\MeshUtility.cs" />
     <Compile Include="Utility\Pair.cs" />
@@ -77,6 +78,7 @@
     <Compile Include="VMesh\Partitioner.cs" />
     <Compile Include="VMesh\Tessellation\TessellationTable.cs" />
     <Compile Include="VMesh\VirtualMesh.cs" />
+    <Compile Include="VMesh\VirtualMeshStreamer.cs" />
   </ItemGroup>
   <ItemGroup>
     <BootstrapperPackage Include=".NETFramework,Version=v4.8">

@@ -21,6 +21,7 @@ namespace VirtualMeshCreator.VMesh
         public Vector3[] vertices;
         public int[] triangles;
         public Vector2[] uvs;
+        public Vector3[] normals;
         public int[] externalEdges;
 
         //Edge Hashing, finds the opposite edges that share a vertex, indicating that two triangles are adjacent

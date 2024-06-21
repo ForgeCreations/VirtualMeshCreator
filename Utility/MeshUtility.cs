@@ -1,7 +1,7 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.Linq;
-using System.Windows.Media;
+using System.Windows.Media.Media3D;
 using VirtualMeshCreator.Math;
 
 namespace VirtualMeshCreator.Utility
@@ -139,6 +139,36 @@ namespace VirtualMeshCreator.Utility
         public static uint cycle3(uint i, uint ofs)
         {
             return i - i % 3 + (i + ofs) % 3;
+        }
+
+        public static uint Hash3(uint x, uint y, uint z)
+        {
+	        //return ( 73856093 * x ) ^ ( 15485867 * y ) ^ ( 83492791 * z );
+	        return Murmur32(new List<uint>(){ x, y, z });
+        }
+
+        const int THRESH_POINTS_ARE_SAME = 1;
+
+        public static uint HashPoint(Vector3 Point)
+        {
+            uint x = (uint)System.Math.Floor(Point.x / (2.0f * THRESH_POINTS_ARE_SAME));
+            uint y = (uint)System.Math.Floor(Point.y / (2.0f * THRESH_POINTS_ARE_SAME));
+            uint z = (uint)System.Math.Floor(Point.z / (2.0f * THRESH_POINTS_ARE_SAME));
+
+	        return Hash3(x, y, z);
+        }
+
+        public static uint HashPoint(Vector3 Point, uint Octant)
+        {
+            uint x = (uint)System.Math.Floor(Point.x / (2.0f * THRESH_POINTS_ARE_SAME) - 0.5f);
+            uint y = (uint)System.Math.Floor(Point.y / (2.0f * THRESH_POINTS_ARE_SAME) - 0.5f);
+            uint z = (uint)System.Math.Floor(Point.z / (2.0f * THRESH_POINTS_ARE_SAME) - 0.5f);
+
+            x += (Octant >> 0) & 1;
+            y += (Octant >> 1) & 1;
+            z += (Octant >> 2) & 1;
+
+            return Hash3(x, y, z);
         }
     }
 }

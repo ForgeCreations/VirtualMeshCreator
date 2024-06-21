@@ -71,8 +71,8 @@ namespace VirtualMeshCreator.VMesh
         private int num_index;
         private int num_tri;
 
-        private Vector3[] verts;
-        private int[] indexes;
+        private readonly Vector3[] verts;
+        private readonly int[] indexes;
 
         private HashTable vert_ht;
         private HashTable corner_ht;
@@ -125,9 +125,10 @@ namespace VirtualMeshCreator.VMesh
                 vert_ht.Add(MeshUtility.hash(verts[i]), i);
             }
 
+            //Guess number of edges based on Euler's formula.
             uint NumEdges = MathUtil.Min3((uint)num_index, (uint)(3 * num_vert - 6), (uint)(num_tri + num_vert));
             Console.WriteLine("Num Edges: " + NumEdges);
-            edges = new List<(Vector3, Vector3)>((int)NumEdges);
+            edges = new List<(Vector3, Vector3)>();
             edge0_ht = new HashTable(NumEdges);
             edge0_ht.Clear((uint)(1 << System.Math.Min(16, (int)System.Math.Floor(System.Math.Log(NumEdges, 2.0)))), NumEdges);
             edge1_ht = new HashTable(NumEdges);
@@ -140,7 +141,7 @@ namespace VirtualMeshCreator.VMesh
                 Vector3 p = verts[vertIndex];
                 corner_ht.Add(MeshUtility.hash(p), corner);
                 (Vector3, Vector3) vPair = (p, verts[indexes[MeshUtility.cycle3(corner)]]);
-                Console.WriteLine("Edge Count: " + edges.Count);
+                //Console.WriteLine("Edge Count: " + edges.Length);
                 if(AddEdgeht(vPair.Item1, vPair.Item2, (uint)edges.Count))
                 {
                     edges.Add(vPair);
