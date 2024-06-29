@@ -163,8 +163,8 @@ namespace VirtualMeshCreator.VMesh
             for(OtherPairIndex = edge0_ht.First(h0); edge0_ht.IsValid(OtherPairIndex); OtherPairIndex = edge0_ht.Next(OtherPairIndex))
             {
                 //Console.WriteLine(index != OtherPairIndex);
-                (Vector3, Vector3) OtherPair = edges[(int)OtherPairIndex];
-                if(p0 == OtherPair.Item1 && p1 == OtherPair.Item2)
+                //(Vector3, Vector3) OtherPair = edges[(int)OtherPairIndex];
+                if(p0 == p1)
                     return false; // Found a duplicate
             }
             edge0_ht.Add(h0, index);
