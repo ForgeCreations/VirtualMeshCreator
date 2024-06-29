@@ -83,9 +83,9 @@ public class TessellationTable
 	private uint AddVert(uint Vert)
 	{
 	    uint Hash = MeshUtility.MurmurFinalize32(Vert);
-        //Find if there already exists one
-        uint Index;
-        for(Index = HashTable.First(Hash); HashTable.IsValid(Index); Index = HashTable.Next(Index))
+        /*//Find if there already exists one
+        //uint Index;
+        foreach(uint Index in HashTable[Hash])
 	    {
 	        if(Verts[FirstVert + Index] == Vert)
 	        {
@@ -100,7 +100,8 @@ public class TessellationTable
 	        HashTable.Add(Hash, Index);
 	    }
 	    
-	    return Index;
+	    return Index;*/
+        return Hash;
 	}
 	
 	private void SplitEdge(uint TriIndex, uint EdgeIndex, uint LeftFactor, uint RightFactor, uint[] TessFactors)

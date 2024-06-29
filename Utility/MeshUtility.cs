@@ -48,15 +48,15 @@ namespace VirtualMeshCreator.Utility
             return hash;
         }
 
-        public static uint MurmurAdd(uint hash, uint elememt)
+        public static uint MurmurAdd(uint hash, uint element)
         {
-            elememt *= 0xcc9e2d51;
-            elememt = (elememt << 15) | (elememt >> (32 - 15));
-            elememt *= 0x1b873593;
+            element *= 0xcc9e2d51;
+            element = (element << 15) | (element >> (32 - 15));
+            element *= 0x1b873593;
 
-            hash ^= elememt;
+            hash ^= element;
             hash = (hash << 13) | (hash >> (32 - 13));
-            hash = (hash * 5 + 0xe6546b64);
+            hash = hash * 5 + 0xe6546b64;
             return hash;
         }
 
@@ -70,73 +70,66 @@ namespace VirtualMeshCreator.Utility
             return hash;
         }
 
-        public static uint lower_nearest_2_power(uint x)
+        public static uint LowerNearest2Power(uint x)
         {
-            while((x & (x - 1)) == 1) x ^= (x & (uint)-x);
+            while((x & (x - 1)) != 0)
+            {
+                x ^= (x & (uint)-x);
+            }
             return x;
         }
 
-        public static uint upper_nearest_2_power(uint x)
+        public static uint UpperNearest2Power(uint x)
         {
-            if((x & (x - 1)) == 1)
+            if((x & (x - 1)) != 0)
             {
-                while((x & (x - 1)) == 1) x ^= (x & (uint)-x);
-                return x == 0 ? 1u : (uint)((int)x << 1);
+                while((x & (x - 1)) != 0)
+                {
+                    x ^= (x & (uint)-x);
+                }
+                return x == 0 ? 1u : (x << 1);
             }
 
             else
             {
-                return x == 0 ? 1u : (uint)((int)x << 1);
+                return x == 0 ? 1u : (x << 1);
             }
         }
 
-        public static uint hash(Vector3 v)
+        public static uint Hash(Vector3 v)
         {
-            (float f, uint i) x, y, z;
-            x.i = 0;
-            y.i = 0;
-            z.i = 0;
-
-            x.f = v.x;
-            y.f = v.y;
-            z.f = v.z;
-            return Murmur32(InitList: new List<uint>()
-            {
-                v.x == 0.0f ? 0u : x.i,
-		        v.y == 0.0f ? 0u : y.i,
-		        v.z == 0.0f ? 0u : z.i
-            });
+            return (uint)((int)v.x * 73856093 ^ (int)v.y * 19349663 ^ (int)v.z * 83492791);
         }
 
-        public static uint hash(KeyValuePair<Vector3, Vector3> e)
+        public static uint Hash(KeyValuePair<Vector3, Vector3> e)
         {
-            uint h0 = hash(e.Key);
-            uint h1 = hash(e.Value);
+            uint h0 = Hash(e.Key);
+            uint h1 = Hash(e.Value);
             return MurmurMix(MurmurAdd(h0, h1));
         }
 
-        public static uint hash(Pair<Vector3, Vector3> e)
+        public static uint Hash(Pair<Vector3, Vector3> e)
         {
-            uint h0 = hash(e.Key);
-            uint h1 = hash(e.Value);
+            uint h0 = Hash(e.Key);
+            uint h1 = Hash(e.Value);
             return MurmurMix(MurmurAdd(h0, h1));
         }
 
-        public static uint hash((Vector3, Vector3) e)
+        public static uint Hash((Vector3, Vector3) e)
         {
-            uint h0 = hash(e.Item1);
-            uint h1 = hash(e.Item2);
+            uint h0 = Hash(e.Item1);
+            uint h1 = Hash(e.Item2);
             return MurmurMix(MurmurAdd(h0, h1));
         }
 
-        public static uint cycle3(uint i)
+        public static uint Cycle3(uint i)
         {
             uint imod3 = i % 3;
             uint i1mod3 = (uint)(1 << (int)imod3) & 3;
             return i - imod3 + i1mod3;
         }
 
-        public static uint cycle3(uint i, uint ofs)
+        public static uint Cycle3(uint i, uint ofs)
         {
             return i - i % 3 + (i + ofs) % 3;
         }

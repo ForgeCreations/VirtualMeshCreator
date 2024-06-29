@@ -7,9 +7,9 @@ using VirtualMeshCreator.Math;
 using VirtualMeshCreator.Utility;
 using static VirtualMeshCreator.Math.VectorUtility;
 
-namespace VirtualMeshCreator.VMesh.Streaming
+namespace VirtualMeshCreator.VMesh.Encoding
 {
-    public static class VirtualMeshBuilder
+    public static class VirtualMeshEncoder
     {
         private const int VIRTUALGEOMETRY_STREAMING_PAGE_GPU_SIZE_BITS =    17;
         private const uint VIRTUALGEOMETRY_STREAMING_PAGE_GPU_SIZE =        (1u << VIRTUALGEOMETRY_STREAMING_PAGE_GPU_SIZE_BITS);
@@ -53,7 +53,13 @@ namespace VirtualMeshCreator.VMesh.Streaming
                 GeometryData
         */
 
-        public static void Build()
+        public static void Encode(ref VirtualMeshSettings Settings)
+        {
+            uint MaxRootPages = CalculateMaxRootPages((uint)Settings.TargetMinimumResidencyInKB);
+            Console.WriteLine("Max Root Pages: " + MaxRootPages);
+        }
+
+        private static void WritePages(Page[] pages, Cluster[] clusters, ClusterGroup[] groups, ClusterGroupPart[] parts)
         {
 
         }

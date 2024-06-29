@@ -1,4 +1,5 @@
 ﻿using System;
+using System.Collections;
 using System.Collections.Generic;
 using System.Linq;
 using System.Threading.Tasks;
@@ -7,14 +8,18 @@ using VirtualMeshCreator.Utility;
 
 namespace VirtualMeshCreator.VMesh
 {
-    public struct Cluster
+    public class Cluster
     {
         public static readonly int CLUSTER_SIZE = 128;
 
-        public int groupID;
+        public int groupID = int.MaxValue;
+        public int groupPartID = int.MaxValue;
+        public int generatingGroupID = int.MaxValue;
         public int mipLevel;
-        public float lodError;
-        public Bounds boxBounds;
+        public float edgeLength = 0.0f;
+        public float lodError = 0.0f;
+        public float surfaceArea = 0.0f;
+        public Bounds boxBounds; //Depricated
         public Sphere sphereBounds;
         public Sphere lodBounds;
 
@@ -24,22 +29,46 @@ namespace VirtualMeshCreator.VMesh
         public Vector3[] normals;
         public int[] externalEdges;
 
+        public uint[] QuantizedPosStart = { 0u, 0u, 0u };
+        public uint QuantizedPosPrecision = 0u;
+        public uint[] QuantizedPosBits = { 0u, 0u, 0u };
+
         //Edge Hashing, finds the opposite edges that share a vertex, indicating that two triangles are adjacent
-        public static void BuildAdjacencyEdgeLink(ref Vector3[] verticies, ref int[] triangles, out Graph edgeLink)
+        public static void BuildAdjacencyEdgeLink(ref Vector3[] vertices, ref int[] triangles, out Graph edgeLink)
         {
+            HashTable edge_ht = new HashTable((uint)triangles.Length);
             edgeLink = new Graph(triangles.Length);
+
+            for(uint i = 0; i < triangles.Length; i++)
+            {
+                Vector3 p0 = vertices[triangles[i]];
+                Vector3 p1 = vertices[triangles[MeshUtility.Cycle3(i)]];
+                uint p01 = MeshUtility.Hash((p0, p1));
+                edge_ht.Add(p01, i);
+
+                foreach(uint j in edge_ht[p01])
+                {
+                    if(p1 == vertices[triangles[j]] && p0 == vertices[triangles[MeshUtility.Cycle3(j)]])
+                    {
+                        edgeLink.IncreaseEdgeCost((int)i, (int)j, 1);
+                        edgeLink.IncreaseEdgeCost((int)j, (int)i, 1);
+                    }
+                }
+            }
         }
 
         //Contruct a triangle adjacency graph based on the edge adjacency. The edge weight is 1. When local needs to be added, the adjacency edge needs to be large enough.
         public static void BuildAdjacencyGraph(ref Graph edgeLink, out Graph graph)
         {
             graph = new Graph(edgeLink.g.Length / 3);
+            int u = 0;
             foreach(Dictionary<int, int> emp in edgeLink.g)
             {
                 foreach(KeyValuePair<int, int> kv in emp)
                 {
-                    graph.IncreaseEdgeCost(kv.Key / 3, kv.Value / 3, 1);
+                    graph.IncreaseEdgeCost(u / 3, kv.Key / 3, 1);
                 }
+                u++;
             }
         }
 
@@ -55,20 +84,22 @@ namespace VirtualMeshCreator.VMesh
         public static void BuildClusterGraph(ref Graph edgeLink, ref int[] mp, int numClusters, out Graph graph)
         {
             graph = new Graph(numClusters);
+            int u = 0;
             foreach(Dictionary<int, int> emp in edgeLink.g)
             {
                 foreach(KeyValuePair<int, int> kv in emp)
                 {
-                    graph.IncreaseEdgeCost(mp[kv.Key], mp[kv.Value], 1);
+                    graph.IncreaseEdgeCost(mp[u], mp[kv.Value], 1);
                 }
+                u++;
             }
         }
     }
 
     public struct ClusterGroup
     {
-        //static readonly int MIN_GROUP_SIZE = 8;
-        static readonly int GROUP_SIZE = 32;
+        static readonly int MIN_GROUP_SIZE = 8;
+        static readonly int GROUP_SIZE = 32; //Maximum group size
 
         public int mipLevel;
         public float minLODError;
@@ -85,7 +116,21 @@ namespace VirtualMeshCreator.VMesh
             //Take the boundary of each cluster and establish a mapping from edge id to cluster id
             int[] mp = new int[0]; //Edge ID to Cluster ID
             int[] mp1 = new int[0]; //Cluster ID to Edge ID
-            Dictionary<int, int>[] extEdges = new Dictionary<int, int>[0];
+            KeyValuePair<int, int>[] extEdges = new KeyValuePair<int, int>[0];
+            int i = 0;
+            for(uint c = offset; c < numClusters; c++)
+            {
+                Cluster cluster = clusters[c];
+                //assert(cluster.mip_level==mip_level);
+                Console.WriteLine(cluster.mipLevel == mipLevel);
+                mp1.Append(mp.Length);
+                foreach(int e in cluster.externalEdges)
+                {
+                    extEdges.Append(new KeyValuePair<int, int>(i, e));
+                    mp.Append(i);
+                }
+                i++;
+            }
 
             Graph edgeLink = new Graph();
             Cluster.BuildClusterGraph(ref edgeLink, ref mp, numClusters, out Graph graph);
@@ -100,9 +145,9 @@ namespace VirtualMeshCreator.VMesh
                 var group = groups.Last();
                 group.mipLevel = mipLevel;
 
-                for(int i = kv.Key; i < kv.Value; i++)
+                for(int ii = kv.Key; ii < kv.Value; ii++)
                 {
-                    uint clusterID = (uint)partitioner.nodeIDs[i];
+                    uint clusterID = (uint)partitioner.nodeIDs[ii];
                     clusters[clusterID + offset].groupID = groups.Length - 1;
                     group.clusters.ToList().Add((int)(clusterID + offset));
                     for(int e_idx = mp1[clusterID]; e_idx < mp.Length && mp[e_idx] == clusterID; e_idx++)
@@ -120,7 +165,7 @@ namespace VirtualMeshCreator.VMesh
 
                         if(is_external)
                         {
-                            uint e = (uint)extEdges[e_idx][1];
+                            uint e = (uint)extEdges[e_idx].Value;
                             group.externalEdges.ToList().Add(new Pair<uint, uint>(clusterID + offset, e));
                         }
                     }
@@ -155,8 +200,8 @@ namespace VirtualMeshCreator.VMesh
             {
                 Vector3[] poses = clusters[kv.Key].vertices;
                 int[] idxes = clusters[kv.Key].triangles;
-                Vector3 p0 = pos[idx[kv.Value]], p1 = pos[idx[MeshUtility.cycle3(kv.Value)]];
-                edge_ht.Add(MeshUtility.hash((p0, p1)), i);
+                Vector3 p0 = pos[idx[kv.Value]], p1 = pos[idx[MeshUtility.Cycle3(kv.Value)]];
+                edge_ht.Add(MeshUtility.Hash((p0, p1)), i);
                 simplifier.LockPostition(p0);
                 simplifier.LockPostition(p1);
                 i++;
@@ -204,16 +249,16 @@ namespace VirtualMeshCreator.VMesh
                                 break;
                             }
                         }
-                        Vector3 p0 = pos[v_idx], p1 = pos[idx[MeshUtility.cycle3(e_idx)]];
+                        Vector3 p0 = pos[v_idx], p1 = pos[idx[MeshUtility.Cycle3(e_idx)]];
                         if(!is_external)
                         {
-                            uint pI = MeshUtility.hash((p0, p1));
-                            for(uint j = edge_ht.First(pI); edge_ht.IsValid(j); edge_ht.Next(j))
+                            uint pI = MeshUtility.Hash((p0, p1));
+                            foreach(uint j in edge_ht[pI])
                             {
                                 Pair<uint, uint> ce = group.externalEdges[j];
                                 pos = clusters[ce.Key].vertices;
                                 idx = clusters[ce.Key].triangles;
-                                if(p0 == pos[idx[ce.Value]] && p1 == pos[idx[MeshUtility.cycle3(ce.Value)]])
+                                if(p0 == pos[idx[ce.Value]] && p1 == pos[idx[MeshUtility.Cycle3(ce.Value)]])
                                 {
                                     is_external = true;
                                     break;

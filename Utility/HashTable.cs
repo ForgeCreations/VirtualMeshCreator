@@ -1,182 +1,156 @@
 ﻿using System;
-using VirtualMeshCreator.Math;
+using System.Collections;
+using System.Collections.Generic;
 
 namespace VirtualMeshCreator.Utility
 {
-    public class HashTable : IDisposable
+    public class HashTable
     {
-        private uint hash_size;
-        private uint hash_mask;
-        private uint index_size;
+        private uint hashSize;
+        private uint hashMask;
+        private uint indexSize;
         private uint[] hash;
-        private uint[] next_index;
+        private uint[] nextIndex;
 
         public HashTable(uint indexSize = 0)
         {
             hash = null;
-            next_index = null;
-            Resize(indexSize, indexSize);
+            nextIndex = null;
+            Resize(indexSize);
         }
 
         public HashTable(uint hashSize, uint indexSize)
         {
             hash = null;
-            next_index = null;
+            nextIndex = null;
             Resize(hashSize, indexSize);
         }
 
-        private void ResizeIndex(uint _index_size)
+        ~HashTable()
         {
-            index_size = _index_size;
-            next_index = new uint[index_size];
-            Array.Clear(next_index, 0, next_index.Length);
+            Free();
         }
 
-        public void Resize(uint indexSize)
+        private void Resize(uint indexSize)
         {
-            ResizeIndex(MeshUtility.lower_nearest_2_power(indexSize));
+            Resize(MeshUtility.LowerNearest2Power(indexSize), indexSize);
         }
 
-        public void Resize(uint hashSize, uint indexSize)
+        private void Resize(uint hashSize, uint indexSize)
         {
-            Dispose();
-            Console.WriteLine((hash_size & (hash_size - 1)) == 0);
+            Free();
+            if((hashSize & (hashSize - 1)) != 0)
+                throw new ArgumentException("Hash size must be a power of two.");
 
-            hash_size = hashSize;
-            hash_mask = hashSize - 1;
+            this.hashSize = hashSize;
+            hashMask = hashSize - 1;
+            this.indexSize = indexSize;
             hash = new uint[hashSize];
-            next_index = new uint[indexSize];
-            Array.Resize(ref hash, (int)(hashSize * 4));
-            Array.Clear(hash, 0, (int)(hashSize * 4));
+            nextIndex = new uint[indexSize];
+            ArrayUtils.Fill(hash, uint.MaxValue);
+        }
+
+        private void ResizeIndex(uint indexSize)
+        {
+            uint[] newIndexes = new uint[indexSize];
+            Array.Copy(nextIndex, newIndexes, this.indexSize);
+            nextIndex = newIndexes;
+            this.indexSize = indexSize;
+        }
+
+        public void Clear()
+        {
+            ArrayUtils.Fill(hash, uint.MaxValue);
+        }
+
+        public void Free()
+        {
+            hashSize = 0;
+            hashMask = 0;
+            indexSize = 0;
+            hash = null;
+            nextIndex = null;
         }
 
         public void Add(uint key, uint idx)
         {
-            if(idx >= index_size)
+            if(idx >= indexSize)
             {
-                ResizeIndex(System.Math.Max(32u, MeshUtility.upper_nearest_2_power(idx + 1u)));
+                ResizeIndex(MeshUtility.UpperNearest2Power(idx + 1));
             }
-
-            key &= hash_mask;
-            next_index[idx] = hash[key];
+            key &= hashMask;
+            nextIndex[idx] = hash[key];
             hash[key] = idx;
-        }
-
-        //Safe for many threads to add concurrently.
-        //Not safe to search the table while other threads are adding.
-        //Will not resize. Only use for presized tables.
-        public void AddConcurrent(uint key, int idx)
-        {
-            key &= hash_mask;
-            //next_index[idx] = FPlatformAtomics::InterlockedExchange((int)hash[key], idx);
-            next_index[idx] = hash[key];
         }
 
         public void Remove(uint key, uint idx)
         {
-            if(idx >= index_size) return;
-            key &= hash_mask;
-            if(hash[key] == idx) hash[key] = next_index[idx];
-            
+            if(idx >= indexSize) return;
+            key &= hashMask;
+            if(hash[key] == idx) hash[key] = nextIndex[idx];
+
             else
             {
-                for(uint i = hash[key]; IsValid(i); i = next_index[i])
+                for(uint i = hash[key]; i != uint.MaxValue; i = nextIndex[i])
                 {
-                    if(next_index[i] == idx)
+                    if(nextIndex[i] == idx)
                     {
-                        next_index[i] = next_index[idx];
+                        nextIndex[i] = nextIndex[idx];
                         break;
                     }
                 }
             }
         }
 
-        public void Clear()
-        {
-            if(index_size > 0)
-            {
-                Array.Resize(ref hash, (int)(hash_size * 4));
-                Array.Clear(hash, 0, (int)(hash_size * 4));
-            }
-
-            if(next_index != null)
-                Array.Clear(next_index, 0, next_index.Length);
-        }
-
         public void Clear(uint inHashSize, uint inIndexSize)
         {
-            Dispose();
+            Free();
 
-            hash_size = inHashSize;
-            index_size = inIndexSize;
+            hashSize = inHashSize;
+            indexSize = inIndexSize;
 
             //check(HashSize > 0);
-            Console.WriteLine(hash_size > 0);
+            //Console.WriteLine(hashSize > 0);
             //check(FMath::IsPowerOfTwo(HashSize));
-            Console.WriteLine(MathUtil.IsPowerOfTwo(hash_size));
+            //Console.WriteLine(MathUtil.IsPowerOfTwo(hashSize));
 
-            if(index_size > 0)
+            if(indexSize > 0)
             {
-                hash_mask = hash_size - 1;
+                hashMask = hashSize - 1;
 
-                hash = new uint[hash_size];
-                next_index = new uint[index_size];
+                hash = new uint[hashSize];
+                nextIndex = new uint[indexSize];
 
                 //FMemory::Memset(Hash, 0xff, HashSize * 4);
-                Array.Resize(ref hash, (int)(hash_size * 4));
-                Array.Clear(hash, 0, (int)(hash_size * 4));
+                Array.Resize(ref hash, (int)(hashSize * 4));
+                Array.Clear(hash, 0, (int)(hashSize * 4));
             }
         }
 
-        public void Dispose()
+        public struct Container : IEnumerable<uint>
         {
-            if(index_size > 0)
+            public uint idx;
+            public uint[] next;
+
+            public IEnumerator<uint> GetEnumerator()
             {
-                hash_mask = 0;
-                index_size = 0;
-
-                hash = new uint[1];
-
-                next_index = null;
+                for(uint i = idx; i != uint.MaxValue; i = next[i])
+                {
+                    yield return i;
+                }
             }
+
+            IEnumerator IEnumerable.GetEnumerator() => GetEnumerator();
         }
 
-        public uint First(uint Key)
+        public Container this[uint key]
         {
-            Key &= hash_mask;
-            return hash[Key];
-        }
-
-        public bool IsValid(uint Index)
-        {
-            return Index != ~0u;
-        }
-
-        public uint Next(uint Index)
-        {
-            //checkSlow(Index < IndexSize);
-            //Console.WriteLine(Index < index_size);
-            //checkSlow(NextIndex[Index] != Index); // check for corrupt tables
-            //Console.WriteLine("Corrupt Tables? [" + (next_index[Index] != Index) + "]");
-            return next_index[Index];
-        }
-
-        public float AverageSearch() 
-        {
-            uint SumAvgSearch = 0;
-            uint NumElements = 0;
-	        for(uint Key = 0; Key < hash_size; Key++)
-	        {
-		        uint NumInBucket = 0;
-		        for(uint i = First(Key); IsValid(i); i = Next(i))
-		        {
-			        NumInBucket++;
-		        }
-
-                SumAvgSearch += NumInBucket * (NumInBucket + 1);
-		        NumElements  += NumInBucket;
-	        }
-            return (SumAvgSearch >> 1) / NumElements;
+            get
+            {
+                if(hashSize == 0 || indexSize == 0) return new Container { idx = uint.MaxValue, next = null };
+                key &= hashMask;
+                return new Container { idx = hash[key], next = nextIndex };
+            }
         }
     }
 }

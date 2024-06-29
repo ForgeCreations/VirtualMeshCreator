@@ -22,7 +22,8 @@ namespace VirtualMeshCreator.VMesh
 
         public Graph(int n)
         {
-            g = new Dictionary<int, int>[n];
+            g = new Dictionary<int, int>[0];
+            Array.Resize(ref g, n);
         }
 
         public void AddNode()
@@ -46,10 +47,10 @@ namespace VirtualMeshCreator.VMesh
             {
                 nvtxs = g.Length
             };
-            foreach(var mp in g)
+            foreach(Dictionary<int, int> mp in g)
             {
                 graph.xadj.ToList().Add(graph.adjncy.Length);
-                foreach(var vp in mp)
+                foreach(KeyValuePair<int, int> vp in mp)
                 {
                     graph.adjncy.ToList().Add(vp.Key);
                     graph.adjwgt.ToList().Add(vp.Value);
@@ -79,6 +80,7 @@ namespace VirtualMeshCreator.VMesh
             {
                 nodeIDs[i] = i;
                 sortTo[i] = i;
+                i++;
             }
         }
 

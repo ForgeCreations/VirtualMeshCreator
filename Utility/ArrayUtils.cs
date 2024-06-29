@@ -9,25 +9,23 @@ namespace VirtualMeshCreator.Utility
     {
         public static void Swap(IList<int> list, int indexA, int indexB)
         {
-            //int temp = list[indexA];
-            //list[indexA] = list[indexB]
-            //list[indexB] = temp;
-            (list[indexB], list[indexA]) = (list[indexA], list[indexB]);
+            int temp = list[indexA];
+            list[indexA] = list[indexB];
+            list[indexB] = temp;
         }
 
-        public static void Swap(int valA, int valB)
+        public static void Swap(ref uint a, ref uint b)
         {
-            (valB, valA) = (valA, valB);
+            uint temp = a;
+            a = b;
+            b = temp;
         }
 
-        public static void Swap(uint valA, uint valB)
+        public static void Swap(ref Vector3 a, ref Vector3 b)
         {
-            (valB, valA) = (valA, valB);
-        }
-
-        public static void Swap(Vector3 valA, Vector3 valB)
-        {
-            (valB, valA) = (valA, valB);
+            Vector3 temp = a;
+            a = b;
+            b = temp;
         }
 
         internal static int[] Subtract(uint[] array1, uint[] array2)
@@ -38,6 +36,17 @@ namespace VirtualMeshCreator.Utility
                 newFinal[i] = (int)(array1[i] - array2[i]);
             }
             return newFinal;
+        }
+
+        public static void Fill<T>(this T[] array, T value)
+        {
+            if(array == null)
+                throw new ArgumentNullException(nameof(array));
+
+            for(int i = 0; i < array.Length; i++)
+            {
+                array[i] = value;
+            }
         }
     }
 }

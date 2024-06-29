@@ -48,7 +48,8 @@
     <WarningLevel>4</WarningLevel>
   </PropertyGroup>
   <PropertyGroup>
-    <StartupObject>VirtualMeshCreator.Program</StartupObject>
+    <StartupObject>
+    </StartupObject>
   </PropertyGroup>
   <ItemGroup>
     <None Include="App.config" />
@@ -63,22 +64,30 @@
     <Compile Include="Math\Vector2Int.cs" />
     <Compile Include="Math\Vector3.cs" />
     <Compile Include="Math\Vector3Int.cs" />
+    <Compile Include="Math\Vector4.cs" />
     <Compile Include="Program.cs" />
     <Compile Include="Utility\ArrayUtils.cs" />
     <Compile Include="Utility\Bounds.cs" />
     <Compile Include="Utility\HashTable.cs" />
+    <Compile Include="Utility\ListUtils.cs" />
     <Compile Include="Utility\LRUCache.cs" />
-    <Compile Include="Utility\MathUtil.cs" />
+    <Compile Include="Math\MathUtil.cs" />
+    <Compile Include="Utility\MemoryPool.cs" />
     <Compile Include="Utility\MeshUtility.cs" />
     <Compile Include="Utility\Pair.cs" />
+    <Compile Include="Utility\VectorUtility.cs" />
+    <Compile Include="VMesh\Encoding\ClusterGroupPart.cs" />
+    <Compile Include="VMesh\Encoding\VirtualMeshSettings.cs" />
     <Compile Include="VMesh\Cluster.cs" />
     <Compile Include="VMesh\Heap.cs" />
     <Compile Include="VMesh\Mesh.cs" />
     <Compile Include="VMesh\MeshSimplifier.cs" />
     <Compile Include="VMesh\Partitioner.cs" />
+    <Compile Include="VMesh\Encoding\PackedCluster.cs" />
+    <Compile Include="VMesh\Encoding\Page.cs" />
     <Compile Include="VMesh\Tessellation\TessellationTable.cs" />
     <Compile Include="VMesh\VirtualMesh.cs" />
-    <Compile Include="VMesh\VirtualMeshStreamer.cs" />
+    <Compile Include="VMesh\Encoding\VirtualMeshEncoder.cs" />
   </ItemGroup>
   <ItemGroup>
     <BootstrapperPackage Include=".NETFramework,Version=v4.8">
@@ -107,6 +116,7 @@
       <SpecificVersion>False</SpecificVersion>
       <HintPath>include\ShellProgressBar.dll</HintPath>
     </Reference>
+    <Reference Include="System" />
     <Reference Include="WindowsBase" />
   </ItemGroup>
   <ItemGroup />

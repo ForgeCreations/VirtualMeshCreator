@@ -122,51 +122,51 @@ namespace VirtualMeshCreator.VMesh
             RemainingTriangleCount = num_tri;
             for(uint i = 0; i < num_vert; i++)
             {
-                vert_ht.Add(MeshUtility.hash(verts[i]), i);
+                vert_ht.Add(MeshUtility.Hash(verts[i]), i);
             }
 
             //Guess number of edges based on Euler's formula.
             uint NumEdges = MathUtil.Min3((uint)num_index, (uint)(3 * num_vert - 6), (uint)(num_tri + num_vert));
             Console.WriteLine("Num Edges: " + NumEdges);
             edges = new List<(Vector3, Vector3)>();
+            ListUtils.Reserve(edges, NumEdges);
             edge0_ht = new HashTable(NumEdges);
-            edge0_ht.Clear((uint)(1 << System.Math.Min(16, (int)System.Math.Floor(System.Math.Log(NumEdges, 2.0)))), NumEdges);
+            //edge0_ht.Clear((uint)(1 << System.Math.Min(16, (int)System.Math.Floor(System.Math.Log(NumEdges, 2.0)))), NumEdges);
             edge1_ht = new HashTable(NumEdges);
-            edge1_ht.Clear((uint)(1 << System.Math.Min(16, (int)System.Math.Floor(System.Math.Log(NumEdges, 2.0)))), NumEdges);
+            //edge1_ht.Clear((uint)(1 << System.Math.Min(16, (int)System.Math.Floor(System.Math.Log(NumEdges, 2.0)))), NumEdges);
 
             for(uint corner = 0u; corner < num_index; corner++)
             {
                 int vertIndex = indexes[corner];
                 vert_refs[vertIndex]++;
                 Vector3 p = verts[vertIndex];
-                corner_ht.Add(MeshUtility.hash(p), corner);
-                (Vector3, Vector3) vPair = (p, verts[indexes[MeshUtility.cycle3(corner)]]);
-                //Console.WriteLine("Edge Count: " + edges.Length);
+                corner_ht.Add(MeshUtility.Hash(p), corner);
+                (Vector3, Vector3) vPair = (p, verts[indexes[MeshUtility.Cycle3(corner)]]);
                 if(AddEdgeht(vPair.Item1, vPair.Item2, (uint)edges.Count))
                 {
                     edges.Add(vPair);
                 }
             }
-            Console.WriteLine("Done Initializing");
         }
 
         public bool AddEdgeht(Vector3 p0, Vector3 p1, uint index)
         {
-            uint h0 = MeshUtility.hash(p0), h1 = MeshUtility.hash(p1);
+            uint h0 = MeshUtility.Hash(p0), h1 = MeshUtility.Hash(p1);
             if(h0 > h1)
             {
-                ArrayUtils.Swap(h0, h1);
-                ArrayUtils.Swap(p0, p1);
+                ArrayUtils.Swap(ref h0, ref h1);
+                ArrayUtils.Swap(ref p0, ref p1);
             }
 
-            uint OtherPairIndex;
-            for(OtherPairIndex = edge0_ht.First(h0); edge0_ht.IsValid(OtherPairIndex); OtherPairIndex = edge0_ht.Next(OtherPairIndex))
+            foreach(uint i in edge0_ht[h0])
             {
-                //Console.WriteLine(index != OtherPairIndex);
-                //(Vector3, Vector3) OtherPair = edges[(int)OtherPairIndex];
-                if(p0 == p1)
+                (Vector3, Vector3) OtherPair = edges[(int)i];
+                if(OtherPair.Item1 == p0 || OtherPair.Item2 == p1)
+                {
                     return false; // Found a duplicate
+                }
             }
+
             edge0_ht.Add(h0, index);
             edge1_ht.Add(h1, index);
             return true;
@@ -176,14 +176,14 @@ namespace VirtualMeshCreator.VMesh
         {
             uint v_idx = (uint)indexes[corner];
             //assert(v_idx != ~0u);
-            Console.WriteLine(v_idx != ~0u);
+            //Console.WriteLine(v_idx != ~0u);
             //assert(vert_refs[v_idx] > 0);
-            Console.WriteLine(vert_refs[v_idx] > 0);
+            //Console.WriteLine(vert_refs[v_idx] > 0);
 
             if(v_idx == index) return;
             if(--vert_refs[v_idx] == 0)
             {
-                vert_ht.Remove(MeshUtility.hash(verts[v_idx]), v_idx);
+                vert_ht.Remove(MeshUtility.Hash(verts[v_idx]), v_idx);
                 RemainingVertexCount--;
             }
             v_idx = index;
@@ -195,8 +195,8 @@ namespace VirtualMeshCreator.VMesh
         {
             int v_idx = indexes[corner];
             Vector3 v = verts[v_idx];
-            uint v0 = MeshUtility.hash(v);
-            for(uint i = vert_ht.First(v0); vert_ht.IsValid(i); vert_ht.Next(i))
+            uint v0 = MeshUtility.Hash(v);
+            foreach(uint i in vert_ht[v0])
             {
                 if(i == v_idx) break;
                 if(v == verts[i])
@@ -210,12 +210,12 @@ namespace VirtualMeshCreator.VMesh
         public bool isTriangleDuplicate(int triangleIndex)
         {
             int i0 = indexes[triangleIndex * 3 + 0], i1 = indexes[triangleIndex * 3 + 1], i2 = indexes[triangleIndex * 3 + 2];
-            uint v0 = MeshUtility.hash(verts[0]);
-            for(uint i = corner_ht.First(v0); corner_ht.IsValid(i); corner_ht.Next(i))
+            uint v0 = MeshUtility.Hash(verts[0]);
+            foreach(uint i in corner_ht[v0])
             {
                 if(i != triangleIndex * 3)
                 {
-                    if(i0 == indexes[i] && i1 == indexes[MeshUtility.cycle3(i)] && i2 == indexes[MeshUtility.cycle3(i, 2)])
+                    if(i0 == indexes[i] && i1 == indexes[MeshUtility.Cycle3(i)] && i2 == indexes[MeshUtility.Cycle3(i, 2)])
                         return true;
                 }
             }
@@ -225,7 +225,7 @@ namespace VirtualMeshCreator.VMesh
         public void FixupTriangle(int tri_idx)
         {
             //assert(!tri_removed[tri_idx]);
-            Console.WriteLine("Triangle Removed: " + !tri_removed[tri_idx]);
+            //Console.WriteLine("Triangle Removed: " + !tri_removed[tri_idx]);
 
             Vector3 p0 = verts[indexes[tri_idx * 3 + 0]];
             Vector3 p1 = verts[indexes[tri_idx * 3 + 1]];
@@ -251,7 +251,7 @@ namespace VirtualMeshCreator.VMesh
                 {
                     uint corner = (uint)(tri_idx * 3 + k);
                     int v_idx = indexes[corner];
-                    corner_ht.Remove(MeshUtility.hash(verts[v_idx]), corner);
+                    corner_ht.Remove(MeshUtility.Hash(verts[v_idx]), corner);
                     SetVertexIndex(corner, ~0u);
                 }
             }
@@ -261,8 +261,8 @@ namespace VirtualMeshCreator.VMesh
         public void GatherAdjacentTriangles(Vector3 p, int[] triangles, out bool Lock)
         {
             Lock = false;
-            uint p0 = MeshUtility.hash(p);
-            for(uint i = corner_ht.First(p0); corner_ht.IsValid(i); corner_ht.Next(i))
+            uint p0 = MeshUtility.Hash(p);
+            foreach(uint i in corner_ht[p0])
             {
                 if(verts[indexes[i]] == p)
                 {
@@ -317,7 +317,7 @@ namespace VirtualMeshCreator.VMesh
 
             if(merge)
             {
-                Console.WriteLine("Merging Verticies");
+                //Console.WriteLine("Merging Verticies");
                 BeginMerge(p0); BeginMerge(p1);
                 foreach(int i in adj_tris)
                 {
@@ -354,8 +354,8 @@ namespace VirtualMeshCreator.VMesh
 
                 foreach(int v_idx in adj_verts)
                 {
-                    uint h = MeshUtility.hash(verts[v_idx]);
-                    for(uint i = edge0_ht.First(h); edge0_ht.IsValid(i); edge0_ht.Next(i))
+                    uint h = MeshUtility.Hash(verts[v_idx]);
+                    foreach(uint i in edge0_ht[h])
                     {
                         if(edges[(int)i].Item1 == verts[v_idx])
                         {
@@ -367,7 +367,7 @@ namespace VirtualMeshCreator.VMesh
                         }
                     }
 
-                    for(uint i = edge1_ht.First(h); edge1_ht.IsValid(i); edge1_ht.Next(i))
+                    foreach(uint i in edge1_ht[h])
                     {
                         if(edges[(int)i].Item2 == verts[v_idx])
                         {
@@ -395,8 +395,8 @@ namespace VirtualMeshCreator.VMesh
 
         public void LockPostition(Vector3 pos)
         {
-            uint p0 = MeshUtility.hash(pos);
-            for(uint i = corner_ht.First(p0); corner_ht.IsValid(i); corner_ht.Next(i))
+            uint p0 = MeshUtility.Hash(pos);
+            foreach(uint i in corner_ht[p0])
             {
                 if(verts[indexes[i]] == pos)
                 {
@@ -415,7 +415,7 @@ namespace VirtualMeshCreator.VMesh
 
             if(RemainingTriangleCount <= targetTriCount)
             {
-                Console.WriteLine("Compacting Mesh");
+                //Console.WriteLine("Compacting Mesh");
                 Compact();
                 return;
             }
@@ -437,8 +437,8 @@ namespace VirtualMeshCreator.VMesh
                 heap.Pop();
 
                 (Vector3, Vector3) e = edges[(int)e_idx];
-                edge0_ht.Remove(MeshUtility.hash(e.Item1), e_idx);
-                edge1_ht.Remove(MeshUtility.hash(e.Item2), e_idx);
+                edge0_ht.Remove(MeshUtility.Hash(e.Item1), e_idx);
+                edge1_ht.Remove(MeshUtility.Hash(e.Item2), e_idx);
 
                 float error = Evaluate(e.Item1, e.Item2, true);
                 if(error > MaxError) MaxError = error;
@@ -453,7 +453,7 @@ namespace VirtualMeshCreator.VMesh
                 }
                 Array.Clear(reevaluate_edge, 0, reevaluate_edge.Length);
             }
-            Console.WriteLine("Compacting Mesh");
+            //Console.WriteLine("Compacting Mesh");
             Compact();
         }
 
@@ -470,7 +470,7 @@ namespace VirtualMeshCreator.VMesh
                 }
             }
             //assert(v_cnt == remaining_num_vert);
-            Console.WriteLine(v_cnt == RemainingVertexCount);
+            //Console.WriteLine(v_cnt == RemainingVertexCount);
 
             int t_cnt = 0;
             for(int i = 0; i < num_tri; i++)
@@ -485,13 +485,13 @@ namespace VirtualMeshCreator.VMesh
                 }
             }
             //assert(t_cnt == remaining_num_tri);
-            Console.WriteLine(t_cnt == RemainingTriangleCount);
+            //Console.WriteLine(t_cnt == RemainingTriangleCount);
         }
 
         public void BeginMerge(Vector3 p)
         {
-            uint h = MeshUtility.hash(p);
-            for(uint i = vert_ht.First(h); vert_ht.IsValid(i); vert_ht.Next(i))
+            uint h = MeshUtility.Hash(p);
+            foreach(uint i in vert_ht[h])
             {
                 if(verts[i] == p)
                 {
@@ -500,7 +500,7 @@ namespace VirtualMeshCreator.VMesh
                 }
             }
 
-            for(uint i = corner_ht.First(h); corner_ht.IsValid(i); corner_ht.Next(i))
+            foreach(uint i in corner_ht[h])
             {
                 if(verts[indexes[i]] == p)
                 {
@@ -509,22 +509,22 @@ namespace VirtualMeshCreator.VMesh
                 }
             }
 
-            for(uint i = edge0_ht.First(h); edge0_ht.IsValid(i); edge0_ht.Next(i))
+            foreach(uint i in edge0_ht[h])
             {
                 if(edges[(int)i].Item1 == p)
                 {
-                    edge0_ht.Remove(MeshUtility.hash(edges[(int)i].Item1), i);
-                    edge1_ht.Remove(MeshUtility.hash(edges[(int)i].Item2), i);
+                    edge0_ht.Remove(MeshUtility.Hash(edges[(int)i].Item1), i);
+                    edge1_ht.Remove(MeshUtility.Hash(edges[(int)i].Item2), i);
                     move_edge.ToList().Add(i);
                 }
             }
 
-            for(uint i = edge1_ht.First(h); edge1_ht.IsValid(i); edge1_ht.Next(i))
+            foreach(uint i in edge1_ht[h])
             {
                 if(edges[(int)i].Item2 == p)
                 {
-                    edge0_ht.Remove(MeshUtility.hash(edges[(int)i].Item1), i);
-                    edge1_ht.Remove(MeshUtility.hash(edges[(int)i].Item2), i);
+                    edge0_ht.Remove(MeshUtility.Hash(edges[(int)i].Item1), i);
+                    edge1_ht.Remove(MeshUtility.Hash(edges[(int)i].Item2), i);
                     move_edge.ToList().Add(i);
                 }
             }
@@ -534,12 +534,12 @@ namespace VirtualMeshCreator.VMesh
         {
             foreach(uint i in move_vert)
             {
-                vert_ht.Add(MeshUtility.hash(verts[i]), i);
+                vert_ht.Add(MeshUtility.Hash(verts[i]), i);
             }
 
             foreach(uint i in move_corner)
             {
-                corner_ht.Add(MeshUtility.hash(verts[indexes[i]]), i);
+                corner_ht.Add(MeshUtility.Hash(verts[indexes[i]]), i);
             }
 
             foreach(uint i in move_edge)

@@ -1,9 +1,4 @@
-﻿using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Threading.Tasks;
-
-namespace VirtualMeshCreator.VMesh.Streaming
+﻿namespace VirtualMeshCreator.VMesh.Encoding
 {
     public struct Page
     {
