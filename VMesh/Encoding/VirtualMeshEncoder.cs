@@ -1,5 +1,6 @@
 ﻿using System;
 using System.Collections.Generic;
+using System.Diagnostics;
 using System.IO;
 using System.Linq;
 using System.Threading.Tasks;
@@ -9,6 +10,18 @@ using static VirtualMeshCreator.Math.VectorUtility;
 
 namespace VirtualMeshCreator.VMesh.Encoding
 {
+    public enum PositionPrecision
+    {
+        Auto,
+        StepSize1cm,
+        StepSize2cm,
+        StepSize4cm,
+        StepSize8cm,
+        StepSize16cm,
+        StepSize32cm,
+        StepSize64cm
+    }
+
     public static class VirtualMeshEncoder
     {
         private const int VIRTUALGEOMETRY_STREAMING_PAGE_GPU_SIZE_BITS =    17;
@@ -64,7 +77,7 @@ namespace VirtualMeshCreator.VMesh.Encoding
 
         }
 
-        private static void PackCluster(Cluster cluster, out PackedCluster pCluster)
+        private static void PackCluster(Cluster cluster, EncodingInfo EncodingInfo, out PackedCluster pCluster)
         {
             pCluster = new PackedCluster();
 
@@ -73,20 +86,20 @@ namespace VirtualMeshCreator.VMesh.Encoding
             pCluster.SetPositionOffset(0);
             pCluster.SetNumTris((uint)cluster.triangles.ToList().Count);
             pCluster.SetIndexOffset(0);
-            //OutCluster.ColorMin = EncodingInfo.ColorMin.X | (EncodingInfo.ColorMin.Y << 8) | (EncodingInfo.ColorMin.Z << 16) | (EncodingInfo.ColorMin.W << 24);
-            //OutCluster.SetColorBitsR(EncodingInfo.ColorBits.X);
-            //OutCluster.SetColorBitsG(EncodingInfo.ColorBits.Y);
-            //OutCluster.SetColorBitsB(EncodingInfo.ColorBits.Z);
-            //OutCluster.SetColorBitsA(EncodingInfo.ColorBits.W);
+            pCluster.ColorMin = (uint)EncodingInfo.ColorMin.x | ((uint)EncodingInfo.ColorMin.y << 8) | ((uint)EncodingInfo.ColorMin.z << 16) | ((uint)EncodingInfo.ColorMin.w << 24);
+            pCluster.SetColorBitsR((uint)EncodingInfo.ColorBits.x);
+            pCluster.SetColorBitsG((uint)EncodingInfo.ColorBits.y);
+            pCluster.SetColorBitsB((uint)EncodingInfo.ColorBits.z);
+            pCluster.SetColorBitsA((uint)EncodingInfo.ColorBits.w);
             pCluster.SetGroupIndex((uint)cluster.groupID);
 
             //1
-            //OutCluster.PosStart = cluster.QuantizedPosStart;
-            //OutCluster.SetBitsPerIndex(EncodingInfo.BitsPerIndex);
-            //OutCluster.SetPosPrecision(cluster.QuantizedPosPrecision);
-            //OutCluster.SetPosBitsX(cluster.QuantizedPosBits.X);
-            //OutCluster.SetPosBitsY(cluster.QuantizedPosBits.Y);
-            //OutCluster.SetPosBitsZ(cluster.QuantizedPosBits.Z);
+            pCluster.PosStart = cluster.QuantizedPosStart;
+            //pCluster.SetBitsPerIndex(EncodingInfo.BitsPerIndex);
+            pCluster.SetPositionOffset(cluster.QuantizedPosPrecision);
+            pCluster.SetPositionOffset((uint)cluster.QuantizedPosBits.x);
+            pCluster.SetPositionOffset((uint)cluster.QuantizedPosBits.y);
+            pCluster.SetPositionOffset((uint)cluster.QuantizedPosBits.z);
 
             //2
             pCluster.LODBounds = new Vector4(cluster.lodBounds.center.x, cluster.lodBounds.center.y, cluster.lodBounds.center.z, cluster.lodBounds.radius);
@@ -100,8 +113,7 @@ namespace VirtualMeshCreator.VMesh.Encoding
 
             //5
             //check(NumTexCoords <= VIRTUALGEOMETRY_MAX_UVS);
-            //static_assert(VIRTUALGEOMETRY_MAX_UVS <= 4, "UV_Prev encoding only supports up to 4 channels");
-            Console.WriteLine("UV_Prev encoding only supports up to 4 channels [" + (VIRTUALGEOMETRY_MAX_UVS <= 4) + "]");
+            Debug.Assert(VIRTUALGEOMETRY_MAX_UVS <= 4, "UV_Prev encoding only supports up to 4 channels");
         }
 
         private static uint CalculateMaxRootPages(uint TargetResidencyInKB)
@@ -111,7 +123,7 @@ namespace VirtualMeshCreator.VMesh.Encoding
         }
 
         #region Normal Encoding
-        private static Vector2 OctahedronEncode(Vector3 N)
+        static Vector2 OctahedronEncode(Vector3 N)
         {
             Vector3 AbsN = GetAbs(N);
             float factor = AbsN.x + AbsN.y + AbsN.z;
@@ -129,19 +141,19 @@ namespace VirtualMeshCreator.VMesh.Encoding
             return new Vector2(N.x, N.y);
         }
 
-        private static void OctahedronEncode(Vector3 N, ref int X, ref int Y, int QuantizationBits)
+        static void OctahedronEncode(Vector3 N, ref uint X, ref uint Y, uint QuantizationBits)
         {
-            int QuantizationMaxValue = (1 << QuantizationBits) - 1;
+            uint QuantizationMaxValue = (uint)(1 << (int)QuantizationBits) - 1;
             float Scale = 0.5f * QuantizationMaxValue;
             float Bias = 0.5f * QuantizationMaxValue + 0.5f;
 
             Vector2 Coord = OctahedronEncode(N);
 
-            X = MathUtil.Clamp((int)(Coord.x * Scale + Bias), 0, QuantizationMaxValue);
-            Y = MathUtil.Clamp((int)(Coord.y * Scale + Bias), 0, QuantizationMaxValue);
+            X = MathUtil.Clamp((uint)(Coord.x * Scale + Bias), 0u, QuantizationMaxValue);
+            Y = MathUtil.Clamp((uint)(Coord.y * Scale + Bias), 0u, QuantizationMaxValue);
         }
 
-        private static Vector3 OctahedronDecode(int X, int Y, int QuantizationBits)
+        static Vector3 OctahedronDecode(int X, int Y, int QuantizationBits)
         {
             int QuantizationMaxValue = (1 << QuantizationBits) - 1;
             float fx = X * (2.0f / QuantizationMaxValue) - 1.0f;
@@ -153,9 +165,9 @@ namespace VirtualMeshCreator.VMesh.Encoding
             return GetUnsafeNormal(new Vector3(fx, fy, fz));
         }
 
-        private static void OctahedronEncodePreciseSIMD(Vector3 N, out uint X, out uint Y, int QuantizationBits)
+        private static void OctahedronEncodePreciseSIMD(Vector3 N, out uint X, out uint Y, uint QuantizationBits)
         {
-            int QuantizationMaxValue = (1 << QuantizationBits) - 1;
+            uint QuantizationMaxValue = (uint)(1 << (int)QuantizationBits) - 1;
             Vector2 ScalarCoord = OctahedronEncode(N);
 
             VectorRegister4Float Scale = VectorSetFloat1(0.5f * QuantizationMaxValue);
@@ -234,92 +246,29 @@ namespace VirtualMeshCreator.VMesh.Encoding
             Y = BestNY;
         }
 
-        private static uint PackNormal(Vector3 Normal, int QuantizationBits)
+        static uint PackNormal(Vector3 Normal, uint QuantizationBits)
         {
             uint X, Y;
             OctahedronEncodePreciseSIMD(Normal, out X, out Y, QuantizationBits);
-            return (Y << QuantizationBits) | X;
+            return (Y << (int)QuantizationBits) | X;
         }
         #endregion
 
-        #region Compression
-        private static byte[] LZCompress(byte[] data)
+        private static Vector2 QuantizeUV(Vector2 uv, int precision)
         {
-            List<byte> compressedData = new List<byte>();
-            int length = data.Length;
-            int pos = 0;
+            float minUV = -8.0f;
+            float maxUV = 8.0f;
 
-            while(pos < length)
-            {
-                int matchLength = 1;
-                int matchDistance = 0;
+            float range = maxUV - minUV;
+            float invRange = 1.0f / range;
 
-                for(int i =1; i < System.Math.Min(pos, 65536); i++)
-                {
-                    int maxMatchLength = System.Math.Min(256, length - pos);
-                    int j = 0;
+            int invMax = (1 << precision) - 1;
+            Vector2 v01 = (uv - new Vector2(minUV)) * invRange;
+            Vector2 iv01 = Vector2.Clamp(v01 * invMax, Vector2.zero, new Vector2(invMax));
+            Vector2 u32 = new Vector2((float)System.Math.Floor(iv01.x + 0.5f), (float)System.Math.Floor(iv01.y + 0.5f));
+            Vector2 n01 = u32 * (1.0f / invMax);
 
-                    while(j < maxMatchLength && data[pos - i + j] == data[pos + j])
-                    {
-                        j++;
-                    }
-
-                    if(j > matchLength)
-                    {
-                        matchLength = j;
-                        matchDistance = i;
-                    }
-                }
-
-                if(matchLength >= 3)
-                {
-                    compressedData.Add((byte)(0b10000000 | (matchLength - 3)));
-                    compressedData.Add((byte)(matchDistance & 0xFF));
-                    compressedData.Add((byte)((matchDistance >> 8) & 0xFF));
-                    pos += matchLength;
-                }
-
-                else
-                {
-                    compressedData.Add(data[pos]);
-                    pos++;
-                }
-            }
-
-            return compressedData.ToArray();
+            return (n01 * range) + new Vector2(minUV);
         }
-
-        private static byte[] LZDecompress(byte[] compressedData)
-        {
-            List<byte> decompressedData = new List<byte>();
-            int pos = 0;
-
-            while(pos < compressedData.Length)
-            {
-                byte flag = compressedData[pos];
-                if((flag & 0b10000000) != 0)
-                {
-                    int matchLength = (flag & 0b10000000) + 3;
-                    int matchDistance = compressedData[pos + 1] | (compressedData[pos + 2] << 8);
-                    int matchStart = decompressedData.Count - matchDistance;
-
-                    for(int i = 0; i < matchLength; i++)
-                    {
-                        decompressedData.Add(decompressedData[matchStart + i]);
-                    }
-
-                    pos += 3;
-                }
-
-                else
-                {
-                    decompressedData.Add(flag);
-                    pos++;
-                }
-            }
-
-            return decompressedData.ToArray();
-        }
-        #endregion
     }
 }

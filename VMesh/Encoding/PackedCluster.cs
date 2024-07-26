@@ -1,4 +1,5 @@
 ﻿using System;
+using System.Diagnostics;
 using VirtualMeshCreator.Math;
 
 namespace VirtualMeshCreator.VMesh.Encoding
@@ -71,7 +72,7 @@ namespace VirtualMeshCreator.VMesh.Encoding
             SetBits(ref ColorBits_GroupIndex, NumBits, 4, 12);
         }
 
-        //Bit Funcs
+        //--------Bit Funcs--------
         private static uint GetBits(uint Value, uint NumBits, uint Offset)
         {
             uint Mask = (1u << (int)NumBits) - 1u;
@@ -81,10 +82,10 @@ namespace VirtualMeshCreator.VMesh.Encoding
         private static void SetBits(ref uint Value, uint Bits, uint NumBits, uint Offset)
         {
             uint Mask = (1u << (int)NumBits) - 1u;
-            //check(Bits <= Mask);
-            Console.WriteLine(Bits <= Mask);
+            Debug.Assert(Bits <= Mask);
             Mask <<= (int)Offset;
             Value = (Value & ~Mask) | (Bits << (int)Offset);
         }
+        //-----------End Bit Funcs-----------
     }
 }

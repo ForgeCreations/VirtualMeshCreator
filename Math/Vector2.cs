@@ -1,10 +1,4 @@
-﻿using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
-
-namespace VirtualMeshCreator.Math
+﻿namespace VirtualMeshCreator.Math
 {
     public struct Vector2
     {
@@ -21,6 +15,12 @@ namespace VirtualMeshCreator.Math
         public static Vector2 forward = new Vector2(0f, 0f);
         public static Vector2 right = new Vector2(1f, 0f);
 
+        public Vector2(float xy)
+        {
+            x = xy;
+            y = xy;
+        }
+
         public Vector2(float x, float y)
         {
             this.x = x;
@@ -36,6 +36,23 @@ namespace VirtualMeshCreator.Math
         public static float Dot(Vector2 v1, Vector2 v2)
         {
             return v1.x * v2.x + v1.y * v2.y;
+        }
+
+        public static bool LessThan(Vector2 v1, Vector2 v2)
+        {
+            return v1.x < v2.x && v1.y < v2.y;
+        }
+
+        public static bool GreaterThan(Vector2 v1, Vector2 v2)
+        {
+            return v1.x > v2.x && v1.y > v2.y;
+        }
+
+        public static Vector2 Clamp(Vector2 x, Vector2 min, Vector2 max)
+        {
+            if(LessThan(x, min)) return min;
+            if(GreaterThan(x, max)) return max;
+            return x;
         }
 
         public static Vector2 operator +(Vector2 v1, Vector2 v2)
@@ -86,6 +103,16 @@ namespace VirtualMeshCreator.Math
         public static bool operator !=(Vector2 v1, Vector2 v2)
         {
             return v1.x != v2.x || v1.y != v2.y;
+        }
+
+        public override bool Equals(object obj)
+        {
+            return base.Equals(obj);
+        }
+
+        public override int GetHashCode()
+        {
+            return base.GetHashCode();
         }
     }
 }

@@ -125,7 +125,11 @@ namespace VirtualMeshCreator.VMesh
                 }
             }
         }
-    
+
+        /// <summary>
+        /// Load an ".obj" model from the path
+        /// </summary>
+        /// <param name="path">The path to the model</param>
         public bool LoadModel3(string path)
         {
             var objHandle = ObjFileLoader.CreateHandle();

@@ -1,6 +1,7 @@
 ﻿using System;
 using System.Collections;
 using System.Collections.Generic;
+using System.Diagnostics;
 using System.Linq;
 using System.Threading.Tasks;
 using VirtualMeshCreator.Math;
@@ -45,7 +46,7 @@ namespace VirtualMeshCreator.VMesh
                 bc += b.bc; bd += b.bd; cd += b.cd;
             }
 
-            public bool Get(Vector3 p)
+            public bool Get(ref Vector3 p)
             {
                 DMatrix4x4 m = new DMatrix4x4(4), inv = new DMatrix4x4(4);
                 m.SetColumn(0, new DVector4(a2, ab, ac, 0.0));
@@ -67,18 +68,18 @@ namespace VirtualMeshCreator.VMesh
             }
         }
 
-        private int num_vert;
-        private int num_index;
-        private int num_tri;
+        private readonly int NumVerticies;
+        private readonly int NumIndicies;
+        private readonly int NumTriangles;
 
-        private readonly Vector3[] verts;
+        private readonly Vector3[] verticies;
         private readonly int[] indexes;
 
-        private HashTable vert_ht;
-        private HashTable corner_ht;
-        private int[] vert_refs;
-        private int[] flags;
-        private BitArray tri_removed;
+        private readonly HashTable VertexHT;
+        private readonly HashTable CornetHT;
+        private readonly int[] VertexRefs;
+        private readonly int[] Flags;
+        private readonly BitArray TriangleRemoved;
 
         private enum Flag
         {
@@ -86,17 +87,17 @@ namespace VirtualMeshCreator.VMesh
             LockMask = 2
         };
 
-        private List<(Vector3, Vector3)> edges;
-        private HashTable edge0_ht;
-        private HashTable edge1_ht;
-        private Heap heap;
+        private readonly List<(Vector3, Vector3)> Edges;
+        private readonly HashTable Edge0HT;
+        private readonly HashTable Edge1HT;
+        private readonly Heap Heap;
 
-        private uint[] move_vert;
-        private uint[] move_corner;
-        private uint[] move_edge;
-        private uint[] reevaluate_edge;
+        private readonly uint[] MoveVertex;
+        private readonly uint[] MoveCorner;
+        private readonly uint[] MoveEdge;
+        private readonly uint[] ReevaluateEdge;
 
-        private Quadric[] tri_quadrics;
+        private Quadric[] TriangleQuadrics;
 
         public int RemainingVertexCount { get; private set; } = 0;
         public int RemainingTriangleCount { get; private set; } = 0;
@@ -104,49 +105,48 @@ namespace VirtualMeshCreator.VMesh
 
         public MeshSimplifier(Vector3[] vertices, int vertexCount, int[] triangles, int triangleCount)
         {
-            num_vert = vertexCount;
-            num_index = triangleCount;
-            num_tri = num_index / 3;
-            verts = vertices;
+            NumVerticies = vertexCount;
+            NumIndicies = triangleCount;
+            NumTriangles = NumIndicies / 3;
+            verticies = vertices;
             indexes = triangles;
-            vert_ht = new HashTable((uint)(1 << System.Math.Min(16, (int)System.Math.Floor(System.Math.Log(num_vert, 2.0)))));
-            //vert_ht = new HashTable(num_vert);
-            vert_refs = new int[num_vert];
-            Array.Clear(vert_refs, 0, num_vert);
-            corner_ht = new HashTable((uint)(1 << System.Math.Min(16, (int)System.Math.Floor(System.Math.Log(num_index, 2.0)))));
-            //corner_ht = new HashTable(num_index);
-            tri_removed = new BitArray(num_tri);
-            flags = new int[num_index];
-            Array.Clear(flags, 0, num_index);
-            RemainingVertexCount = num_vert;
-            RemainingTriangleCount = num_tri;
-            for(uint i = 0; i < num_vert; i++)
+            VertexHT = new HashTable((uint)(1 << System.Math.Min(16, (int)System.Math.Floor(System.Math.Log(NumVerticies, 2.0)))));
+            VertexRefs = new int[NumVerticies];
+            Array.Clear(VertexRefs, 0, NumVerticies);
+            CornetHT = new HashTable((uint)(1 << System.Math.Min(16, (int)System.Math.Floor(System.Math.Log(NumIndicies, 2.0)))));
+            TriangleRemoved = new BitArray(NumTriangles);
+            Flags = new int[NumIndicies];
+            Array.Clear(Flags, 0, NumIndicies);
+            RemainingVertexCount = NumVerticies;
+            RemainingTriangleCount = NumTriangles;
+            for(uint i = 0; i < NumVerticies; i++)
             {
-                vert_ht.Add(MeshUtility.Hash(verts[i]), i);
+                VertexHT.Add(MeshUtility.Hash(verticies[i]), i);
             }
 
-            //Guess number of edges based on Euler's formula.
-            uint NumEdges = MathUtil.Min3((uint)num_index, (uint)(3 * num_vert - 6), (uint)(num_tri + num_vert));
+            // Guess number of edges based on Euler's formula.
+            uint NumEdges = MathUtil.Min3((uint)NumIndicies, (uint)(3 * NumVerticies - 6), (uint)(NumTriangles + NumVerticies));
             Console.WriteLine("Num Edges: " + NumEdges);
-            edges = new List<(Vector3, Vector3)>();
-            ListUtils.Reserve(edges, NumEdges);
-            edge0_ht = new HashTable(NumEdges);
-            //edge0_ht.Clear((uint)(1 << System.Math.Min(16, (int)System.Math.Floor(System.Math.Log(NumEdges, 2.0)))), NumEdges);
-            edge1_ht = new HashTable(NumEdges);
-            //edge1_ht.Clear((uint)(1 << System.Math.Min(16, (int)System.Math.Floor(System.Math.Log(NumEdges, 2.0)))), NumEdges);
+            Edges = new List<(Vector3, Vector3)>();
+            ListUtils.Reserve(Edges, NumEdges);
+            Edge0HT = new HashTable(NumEdges);
+            Edge0HT.Clear((uint)(1 << System.Math.Min(16, (int)System.Math.Floor(System.Math.Log(NumEdges, 2.0)))), NumEdges);
+            Edge1HT = new HashTable(NumEdges);
+            Edge1HT.Clear((uint)(1 << System.Math.Min(16, (int)System.Math.Floor(System.Math.Log(NumEdges, 2.0)))), NumEdges);
 
-            for(uint corner = 0u; corner < num_index; corner++)
+            for(uint corner = 0u; corner < NumIndicies; corner++)
             {
                 int vertIndex = indexes[corner];
-                vert_refs[vertIndex]++;
-                Vector3 p = verts[vertIndex];
-                corner_ht.Add(MeshUtility.Hash(p), corner);
-                (Vector3, Vector3) vPair = (p, verts[indexes[MeshUtility.Cycle3(corner)]]);
-                if(AddEdgeht(vPair.Item1, vPair.Item2, (uint)edges.Count))
+                VertexRefs[vertIndex]++;
+                Vector3 p = verticies[vertIndex];
+                CornetHT.Add(MeshUtility.Hash(p), corner);
+                (Vector3, Vector3) vPair = (p, verticies[indexes[MeshUtility.Cycle3(corner)]]);
+                if(AddEdgeht(vPair.Item1, vPair.Item2, (uint)Edges.Count))
                 {
-                    edges.Add(vPair);
+                    Edges.Add(vPair);
                 }
             }
+            Console.WriteLine("[MeshSimplifier] Finished Initialization");
         }
 
         public bool AddEdgeht(Vector3 p0, Vector3 p1, uint index)
@@ -158,48 +158,49 @@ namespace VirtualMeshCreator.VMesh
                 ArrayUtils.Swap(ref p0, ref p1);
             }
 
-            foreach(uint i in edge0_ht[h0])
+            foreach(uint i in Edge0HT[h0])
             {
-                (Vector3, Vector3) OtherPair = edges[(int)i];
+                (Vector3, Vector3) OtherPair = Edges[(int)i];
                 if(OtherPair.Item1 == p0 || OtherPair.Item2 == p1)
                 {
                     return false; // Found a duplicate
                 }
             }
 
-            edge0_ht.Add(h0, index);
-            edge1_ht.Add(h1, index);
+            Edge0HT.Add(h0, index);
+            Edge1HT.Add(h1, index);
             return true;
         }
 
         public void SetVertexIndex(uint corner, uint index)
         {
             uint v_idx = (uint)indexes[corner];
-            //assert(v_idx != ~0u);
-            //Console.WriteLine(v_idx != ~0u);
-            //assert(vert_refs[v_idx] > 0);
-            //Console.WriteLine(vert_refs[v_idx] > 0);
+            Debug.Assert(v_idx != ~0u);
+            Debug.Assert(VertexRefs[v_idx] > 0);
 
-            if(v_idx == index) return;
-            if(--vert_refs[v_idx] == 0)
+            if(v_idx == index)
+                return;
+            if(--VertexRefs[v_idx] == 0)
             {
-                vert_ht.Remove(MeshUtility.Hash(verts[v_idx]), v_idx);
+                VertexHT.Remove(MeshUtility.Hash(verticies[v_idx]), v_idx);
                 RemainingVertexCount--;
             }
             v_idx = index;
-            if(v_idx != ~0u) vert_refs[v_idx]++;
+            if(v_idx != ~0u)
+                VertexRefs[v_idx]++;
         }
 
-        //Assign corner to the Keys.ToList()[0] encourntered identical point
+        // Assign corner to the Keys.ToList()[0] encourntered identical point
         public void RemoveIfVertexDuplicate(uint corner)
         {
             int v_idx = indexes[corner];
-            Vector3 v = verts[v_idx];
+            Vector3 v = verticies[v_idx];
             uint v0 = MeshUtility.Hash(v);
-            foreach(uint i in vert_ht[v0])
+            foreach(uint i in VertexHT[v0])
             {
-                if(i == v_idx) break;
-                if(v == verts[i])
+                if(i == v_idx)
+                    break;
+                if(v == verticies[i])
                 {
                     SetVertexIndex(corner, i);
                     break;
@@ -207,11 +208,11 @@ namespace VirtualMeshCreator.VMesh
             }
         }
 
-        public bool isTriangleDuplicate(int triangleIndex)
+        public bool IsTriangleDuplicate(int triangleIndex)
         {
             int i0 = indexes[triangleIndex * 3 + 0], i1 = indexes[triangleIndex * 3 + 1], i2 = indexes[triangleIndex * 3 + 2];
-            uint v0 = MeshUtility.Hash(verts[0]);
-            foreach(uint i in corner_ht[v0])
+            uint v0 = MeshUtility.Hash(verticies[0]);
+            foreach(uint i in CornetHT[v0])
             {
                 if(i != triangleIndex * 3)
                 {
@@ -224,12 +225,11 @@ namespace VirtualMeshCreator.VMesh
 
         public void FixupTriangle(int tri_idx)
         {
-            //assert(!tri_removed[tri_idx]);
-            //Console.WriteLine("Triangle Removed: " + !tri_removed[tri_idx]);
+            Debug.Assert(!TriangleRemoved[tri_idx]);
 
-            Vector3 p0 = verts[indexes[tri_idx * 3 + 0]];
-            Vector3 p1 = verts[indexes[tri_idx * 3 + 1]];
-            Vector3 p2 = verts[indexes[tri_idx * 3 + 2]];
+            Vector3 p0 = verticies[indexes[tri_idx * 3 + 0]];
+            Vector3 p1 = verticies[indexes[tri_idx * 3 + 1]];
+            Vector3 p2 = verticies[indexes[tri_idx * 3 + 2]];
 
             bool is_removed = false;
             if(!is_removed)
@@ -239,41 +239,44 @@ namespace VirtualMeshCreator.VMesh
 
             if(!is_removed)
             {
-                for(int k = 0; k < 3; k++) RemoveIfVertexDuplicate((uint)(tri_idx * 3 + k));
-                is_removed = isTriangleDuplicate(tri_idx);
+                for(int k = 0; k < 3; k++)
+                    RemoveIfVertexDuplicate((uint)(tri_idx * 3 + k));
+                is_removed = IsTriangleDuplicate(tri_idx);
             }
 
             if(is_removed)
             {
-                tri_removed.Set(tri_idx, true);
+                TriangleRemoved.Set(tri_idx, true);
                 RemainingTriangleCount--;
                 for(int k = 0; k < 3; k++)
                 {
                     uint corner = (uint)(tri_idx * 3 + k);
                     int v_idx = indexes[corner];
-                    corner_ht.Remove(MeshUtility.Hash(verts[v_idx]), corner);
+                    CornetHT.Remove(MeshUtility.Hash(verticies[v_idx]), corner);
                     SetVertexIndex(corner, ~0u);
                 }
             }
-            else tri_quadrics[tri_idx] = new Quadric(new DVector3(p0.x, p0.y, p0.z), new DVector3(p1.x, p1.y, p1.z), new DVector3(p2.x, p2.y, p2.z));
+
+            else
+                TriangleQuadrics[tri_idx] = new Quadric(new DVector3(p0.x, p0.y, p0.z), new DVector3(p1.x, p1.y, p1.z), new DVector3(p2.x, p2.y, p2.z));
         }
 
         public void GatherAdjacentTriangles(Vector3 p, int[] triangles, out bool Lock)
         {
             Lock = false;
             uint p0 = MeshUtility.Hash(p);
-            foreach(uint i in corner_ht[p0])
+            foreach(uint i in CornetHT[p0])
             {
-                if(verts[indexes[i]] == p)
+                if(verticies[indexes[i]] == p)
                 {
                     int tri_idx = (int)i / 3;
-                    if((flags[tri_idx * 3] & (int)Flag.AdjMask) == 0)
+                    if((Flags[tri_idx * 3] & (int)Flag.AdjMask) == 0)
                     {
-                        flags[tri_idx * 3] |= (int)Flag.AdjMask;
-                        triangles.ToList().Add(tri_idx);
+                        Flags[tri_idx * 3] |= (int)Flag.AdjMask;
+                        triangles.Append(tri_idx);
                     }
 
-                    if((flags[i] & (int)Flag.LockMask) == 1)
+                    if((Flags[i] & (int)Flag.LockMask) == 1)
                     {
                         Lock = true;
                     }
@@ -283,14 +286,16 @@ namespace VirtualMeshCreator.VMesh
 
         public float Evaluate(Vector3 p0, Vector3 p1, bool merge)
         {
-            if(p0 == p1) return 0.0f;
+            if(p0 == p1)
+                return 0.0f;
 
             float error = 0.0f;
 
             int[] adj_tris = new int[0];
             GatherAdjacentTriangles(p0, adj_tris, out bool lock0);
             GatherAdjacentTriangles(p1, adj_tris, out bool lock1);
-            if(adj_tris.Length == 0) return 0.0f;
+            if(adj_tris.Length == 0)
+                return 0.0f;
             if(adj_tris.Length > 24)
             {
                 error += 0.5f * (adj_tris.Length - 24);
@@ -299,16 +304,20 @@ namespace VirtualMeshCreator.VMesh
             Quadric q = new Quadric();
             foreach(int i in adj_tris)
             {
-                q.Add(tri_quadrics[i]);
+                q.Add(TriangleQuadrics[i]);
             }
             Vector3 p = (p0 + p1) * 0.5f;
 
             bool is_valid_pos = (p - p0).magnitude + (p - p1).magnitude > 2 * (p0 - p1).magnitude;
 
-            if(lock0 && lock1) error += 1e8f;
-            if(lock0 && !lock1) p = p0;
-            else if(!lock0 && lock1) p = p1;
-            else if(!q.Get(p)) p = (p0 + p1) * 0.5f;
+            if(lock0 && lock1)
+                error += 1e8f;
+            if(lock0 && !lock1)
+                p = p0;
+            else if(!lock0 && lock1)
+                p = p1;
+            else if(!q.Get(ref p))
+                p = (p0 + p1) * 0.5f;
             if(!is_valid_pos)
             {
                 p = (p0 + p1) * 0.5f;
@@ -317,27 +326,29 @@ namespace VirtualMeshCreator.VMesh
 
             if(merge)
             {
-                //Console.WriteLine("Merging Verticies");
                 BeginMerge(p0); BeginMerge(p1);
                 foreach(int i in adj_tris)
                 {
                     for(int k = 0; k < 3; k++)
                     {
                         int corner = i * 3 + k;
-                        Vector3 pos = verts[indexes[corner]];
+                        Vector3 pos = verticies[indexes[corner]];
                         if(pos == p0 || pos == p1)
                         {
                             pos = p;
-                            if(lock0 || lock1) flags[corner] |= (int)Flag.LockMask;
+                            if(lock0 || lock1)
+                                Flags[corner] |= (int)Flag.LockMask;
                         }
                     }
                 }
 
-                foreach(int i in move_edge)
+                foreach(uint i in MoveEdge)
                 {
-                    (Vector3, Vector3) e = edges[i];
-                    if(e.Item1 == p0 || e.Item1 == p1) e.Item1 = p;
-                    if(e.Item2 == p0 || e.Item2 == p1) e.Item2 = p;
+                    (Vector3, Vector3) e = Edges[(int)i];
+                    if(e.Item1 == p0 || e.Item1 == p1)
+                        e.Item1 = p;
+                    if(e.Item2 == p0 || e.Item2 == p1)
+                        e.Item2 = p;
                 }
                 EndMerge();
 
@@ -346,7 +357,7 @@ namespace VirtualMeshCreator.VMesh
                 {
                     for(int k = 0; k < 3; k++)
                     {
-                        adj_verts.ToList().Add(indexes[i * 3 + k]);
+                        adj_verts.Append(indexes[i * 3 + k]);
                     }
                 }
                 Array.Sort(adj_verts, 0, adj_verts.Length);
@@ -354,27 +365,27 @@ namespace VirtualMeshCreator.VMesh
 
                 foreach(int v_idx in adj_verts)
                 {
-                    uint h = MeshUtility.Hash(verts[v_idx]);
-                    foreach(uint i in edge0_ht[h])
+                    uint h = MeshUtility.Hash(verticies[v_idx]);
+                    foreach(uint i in Edge0HT[h])
                     {
-                        if(edges[(int)i].Item1 == verts[v_idx])
+                        if(Edges[(int)i].Item1 == verticies[v_idx])
                         {
-                            if(heap.IsPresent(i))
+                            if(Heap.IsPresent(i))
                             {
-                                heap.Remove(i);
-                                reevaluate_edge.ToList().Add(i);
+                                Heap.Remove(i);
+                                ReevaluateEdge.Append(i);
                             }
                         }
                     }
 
-                    foreach(uint i in edge1_ht[h])
+                    foreach(uint i in Edge1HT[h])
                     {
-                        if(edges[(int)i].Item2 == verts[v_idx])
+                        if(Edges[(int)i].Item2 == verticies[v_idx])
                         {
-                            if(heap.IsPresent(i))
+                            if(Heap.IsPresent(i))
                             {
-                                heap.Remove(i);
-                                reevaluate_edge.ToList().Add(i);
+                                Heap.Remove(i);
+                                ReevaluateEdge.Append(i);
                             }
                         }
                     }
@@ -388,7 +399,7 @@ namespace VirtualMeshCreator.VMesh
 
             foreach(int i in adj_tris)
             {
-                flags[i * 3] &= (int)~Flag.AdjMask;
+                Flags[i * 3] &= (int)~Flag.AdjMask;
             }
             return error;
         }
@@ -396,163 +407,164 @@ namespace VirtualMeshCreator.VMesh
         public void LockPostition(Vector3 pos)
         {
             uint p0 = MeshUtility.Hash(pos);
-            foreach(uint i in corner_ht[p0])
+            foreach(uint i in CornetHT[p0])
             {
-                if(verts[indexes[i]] == pos)
+                if(verticies[indexes[i]] == pos)
                 {
-                    flags[i] |= (int)Flag.LockMask;
+                    Flags[i] |= (int)Flag.LockMask;
                 }
             }
         }
 
         public void Simplify(int targetTriCount)
         {
-            Array.Resize(ref tri_quadrics, num_tri);
-            for(int i = 0; i < num_tri; i++)
+            Array.Resize(ref TriangleQuadrics, NumTriangles);
+            for(int i = 0; i < NumTriangles; i++)
             {
                 FixupTriangle(i);
             }
 
             if(RemainingTriangleCount <= targetTriCount)
             {
-                //Console.WriteLine("Compacting Mesh");
                 Compact();
                 return;
             }
-            heap.Resize(edges.Count);
+            Heap.Resize(Edges.Count);
             uint ii = 0;
-            foreach((Vector3, Vector3) e in edges)
+            foreach((Vector3, Vector3) e in Edges)
             {
                 float error = Evaluate(e.Item1, e.Item2, false);
-                heap.Add(error, ii);
+                Heap.Add(error, ii);
                 ii++;
             }
 
             MaxError = 0;
-            while(!heap.Empty)
+            while(!Heap.Empty)
             {
-                uint e_idx = heap.Top();
-                if(heap.GetKey(e_idx) >= 1e6) break;
+                uint e_idx = Heap.Top();
+                if(Heap.GetKey(e_idx) >= 1e6) break;
 
-                heap.Pop();
+                Heap.Pop();
 
-                (Vector3, Vector3) e = edges[(int)e_idx];
-                edge0_ht.Remove(MeshUtility.Hash(e.Item1), e_idx);
-                edge1_ht.Remove(MeshUtility.Hash(e.Item2), e_idx);
+                (Vector3, Vector3) e = Edges[(int)e_idx];
+                Edge0HT.Remove(MeshUtility.Hash(e.Item1), e_idx);
+                Edge1HT.Remove(MeshUtility.Hash(e.Item2), e_idx);
 
                 float error = Evaluate(e.Item1, e.Item2, true);
-                if(error > MaxError) MaxError = error;
+                if(error > MaxError)
+                    MaxError = error;
 
-                if(RemainingTriangleCount <= targetTriCount) break;
+                if(RemainingTriangleCount <= targetTriCount)
+                    break;
 
-                foreach(uint i in reevaluate_edge)
+                foreach(uint i in ReevaluateEdge)
                 {
-                    (Vector3, Vector3) ee = edges[(int)i];
+                    (Vector3, Vector3) ee = Edges[(int)i];
                     float error_b = Evaluate(ee.Item1, ee.Item2, false);
-                    heap.Add(error_b, i);
+                    Heap.Add(error_b, i);
                 }
-                Array.Clear(reevaluate_edge, 0, reevaluate_edge.Length);
+                Array.Clear(ReevaluateEdge, 0, ReevaluateEdge.Length);
             }
-            //Console.WriteLine("Compacting Mesh");
             Compact();
         }
 
         public void Compact()
         {
+            Console.WriteLine("Compacting Mesh");
             int v_cnt = 0;
-            for(int i = 0; i < num_vert; i++)
+            for(int i = 0; i < NumVerticies; i++)
             {
-                if(vert_refs[i] > 0)
+                if(VertexRefs[i] > 0)
                 {
-                    if(i != v_cnt) verts[v_cnt] = verts[i];
-                    //Reuse subscript
-                    vert_refs[i] = v_cnt++;
+                    if(i != v_cnt)
+                        verticies[v_cnt] = verticies[i];
+                    // Reuse subscript
+                    VertexRefs[i] = v_cnt++;
                 }
             }
-            //assert(v_cnt == remaining_num_vert);
-            //Console.WriteLine(v_cnt == RemainingVertexCount);
+            Debug.Assert(v_cnt == RemainingVertexCount);
 
             int t_cnt = 0;
-            for(int i = 0; i < num_tri; i++)
+            for(int i = 0; i < NumTriangles; i++)
             {
-                if(!tri_removed[i])
+                if(!TriangleRemoved[i])
                 {
                     for(int k = 0; k < 3; k++)
                     {
-                        indexes[t_cnt * 3 + k] = vert_refs[indexes[i * 3 + k]];
+                        indexes[t_cnt * 3 + k] = VertexRefs[indexes[i * 3 + k]];
                     }
                     t_cnt++;
                 }
             }
-            //assert(t_cnt == remaining_num_tri);
-            //Console.WriteLine(t_cnt == RemainingTriangleCount);
+            Debug.Assert(t_cnt == RemainingTriangleCount);
+            Console.WriteLine("End Mesh Compacting");
         }
 
         public void BeginMerge(Vector3 p)
         {
             uint h = MeshUtility.Hash(p);
-            foreach(uint i in vert_ht[h])
+            foreach(uint i in VertexHT[h])
             {
-                if(verts[i] == p)
+                if(verticies[i] == p)
                 {
-                    vert_ht.Remove(h, i);
-                    move_vert.ToList().Add(i);
+                    VertexHT.Remove(h, i);
+                    MoveVertex.Append(i);
                 }
             }
 
-            foreach(uint i in corner_ht[h])
+            foreach(uint i in CornetHT[h])
             {
-                if(verts[indexes[i]] == p)
+                if(verticies[indexes[i]] == p)
                 {
-                    corner_ht.Remove(h, i);
-                    move_corner.ToList().Add(i);
+                    CornetHT.Remove(h, i);
+                    MoveCorner.Append(i);
                 }
             }
 
-            foreach(uint i in edge0_ht[h])
+            foreach(uint i in Edge0HT[h])
             {
-                if(edges[(int)i].Item1 == p)
+                if(Edges[(int)i].Item1 == p)
                 {
-                    edge0_ht.Remove(MeshUtility.Hash(edges[(int)i].Item1), i);
-                    edge1_ht.Remove(MeshUtility.Hash(edges[(int)i].Item2), i);
-                    move_edge.ToList().Add(i);
+                    Edge0HT.Remove(MeshUtility.Hash(Edges[(int)i].Item1), i);
+                    Edge1HT.Remove(MeshUtility.Hash(Edges[(int)i].Item2), i);
+                    MoveEdge.Append(i);
                 }
             }
 
-            foreach(uint i in edge1_ht[h])
+            foreach(uint i in Edge1HT[h])
             {
-                if(edges[(int)i].Item2 == p)
+                if(Edges[(int)i].Item2 == p)
                 {
-                    edge0_ht.Remove(MeshUtility.Hash(edges[(int)i].Item1), i);
-                    edge1_ht.Remove(MeshUtility.Hash(edges[(int)i].Item2), i);
-                    move_edge.ToList().Add(i);
+                    Edge0HT.Remove(MeshUtility.Hash(Edges[(int)i].Item1), i);
+                    Edge1HT.Remove(MeshUtility.Hash(Edges[(int)i].Item2), i);
+                    MoveEdge.Append(i);
                 }
             }
         }
 
         public void EndMerge()
         {
-            foreach(uint i in move_vert)
+            foreach(uint i in MoveVertex)
             {
-                vert_ht.Add(MeshUtility.Hash(verts[i]), i);
+                VertexHT.Add(MeshUtility.Hash(verticies[i]), i);
             }
 
-            foreach(uint i in move_corner)
+            foreach(uint i in MoveCorner)
             {
-                corner_ht.Add(MeshUtility.Hash(verts[indexes[i]]), i);
+                CornetHT.Add(MeshUtility.Hash(verticies[indexes[i]]), i);
             }
 
-            foreach(uint i in move_edge)
+            foreach(uint i in MoveEdge)
             {
-                (Vector3, Vector3) e = edges[(int)i];
+                (Vector3, Vector3) e = Edges[(int)i];
                 if(e.Item1 == e.Item2 || !AddEdgeht(e.Item1, e.Item2, i))
                 {
-                    heap.Remove(i);
+                    Heap.Remove(i);
                 }
             }
-            move_vert.ToList().Clear();
-            move_corner.ToList().Clear();
-            move_edge.ToList().Clear();
+            MoveVertex.ToList().Clear();
+            MoveCorner.ToList().Clear();
+            MoveEdge.ToList().Clear();
         }
     }
 }

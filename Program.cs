@@ -1,6 +1,5 @@
 ﻿using ShellProgressBar;
 using System;
-using System.Threading.Tasks;
 using VirtualMeshCreator.VMesh;
 
 namespace VirtualMeshCreator
@@ -17,11 +16,6 @@ namespace VirtualMeshCreator
             {
                 VirtualMesh vMesh = new VirtualMesh();
                 vMesh.Build(ref mesh);
-                Console.WriteLine("Enter file name for Virtual Mesh");
-                string fileName = Console.ReadLine();
-                Console.WriteLine("Enter export path for Virtual Mesh");
-                string exportPath = Console.ReadLine();
-                vMesh.Save(fileName, exportPath);
             }
         }
     }
