@@ -1,5 +1,4 @@
 ﻿using System;
-using System.IO;
 
 namespace VirtualMeshCreator.VMesh
 {
@@ -142,6 +141,13 @@ namespace VirtualMeshCreator.VMesh
             heap_indexes[idx] = ~0u;
             if(key < keys[heap[i]]) PushDown(i);
             else PushUp(i);
+        }
+
+        private void Swap(int offset, int index1, int index2)
+        {
+            var temp = heap[offset + index1];
+            heap[offset + index1] = heap[offset + index2];
+            heap[offset + index2] = temp;
         }
 
         public void Dispose()

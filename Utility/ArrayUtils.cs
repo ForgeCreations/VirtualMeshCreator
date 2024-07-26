@@ -14,6 +14,13 @@ namespace VirtualMeshCreator.Utility
             list[indexB] = temp;
         }
 
+        public static void Swap(IList<uint> list, int indexA, int indexB)
+        {
+            uint temp = list[indexA];
+            list[indexA] = list[indexB];
+            list[indexB] = temp;
+        }
+
         public static void Swap(ref uint a, ref uint b)
         {
             uint temp = a;

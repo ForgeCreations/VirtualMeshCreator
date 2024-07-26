@@ -46,6 +46,7 @@
     <DefineConstants>TRACE</DefineConstants>
     <ErrorReport>prompt</ErrorReport>
     <WarningLevel>4</WarningLevel>
+    <Prefer32Bit>false</Prefer32Bit>
   </PropertyGroup>
   <PropertyGroup>
     <StartupObject>
@@ -53,10 +54,11 @@
   </PropertyGroup>
   <ItemGroup>
     <None Include="App.config" />
-    <None Include="Virtual Meshes\Font_Reconstructed.vmesh" />
   </ItemGroup>
   <ItemGroup>
     <Compile Include="include\METIS.cs" />
+    <Compile Include="IO\Compression.cs" />
+    <Compile Include="IO\FBitWriter.cs" />
     <Compile Include="Math\DMatrix4x4.cs" />
     <Compile Include="Math\DVector3.cs" />
     <Compile Include="Math\DVector4.cs" />
@@ -68,18 +70,23 @@
     <Compile Include="Program.cs" />
     <Compile Include="Utility\ArrayUtils.cs" />
     <Compile Include="Utility\Bounds.cs" />
-    <Compile Include="Utility\HashTable.cs" />
+    <Compile Include="DataStructures\HashTable.cs" />
+    <Compile Include="Utility\GraphUtils.cs" />
     <Compile Include="Utility\ListUtils.cs" />
-    <Compile Include="Utility\LRUCache.cs" />
+    <Compile Include="DataStructures\LRUCache.cs" />
     <Compile Include="Math\MathUtil.cs" />
     <Compile Include="Utility\MemoryPool.cs" />
     <Compile Include="Utility\MeshUtility.cs" />
     <Compile Include="Utility\Pair.cs" />
-    <Compile Include="Utility\VectorUtility.cs" />
+    <Compile Include="Utility\Utils.cs" />
+    <Compile Include="Math\VectorUtility.cs" />
+    <Compile Include="IO\BitReader.cs" />
+    <Compile Include="IO\BitWriter.cs" />
+    <Compile Include="IO\ByteStreamingPool.cs" />
     <Compile Include="VMesh\Encoding\ClusterGroupPart.cs" />
     <Compile Include="VMesh\Encoding\VirtualMeshSettings.cs" />
     <Compile Include="VMesh\Cluster.cs" />
-    <Compile Include="VMesh\Heap.cs" />
+    <Compile Include="DataStructures\Heap.cs" />
     <Compile Include="VMesh\Mesh.cs" />
     <Compile Include="VMesh\MeshSimplifier.cs" />
     <Compile Include="VMesh\Partitioner.cs" />
@@ -88,6 +95,7 @@
     <Compile Include="VMesh\Tessellation\TessellationTable.cs" />
     <Compile Include="VMesh\VirtualMesh.cs" />
     <Compile Include="VMesh\Encoding\VirtualMeshEncoder.cs" />
+    <Compile Include="VMesh\VirtualMeshSettings.cs" />
   </ItemGroup>
   <ItemGroup>
     <BootstrapperPackage Include=".NETFramework,Version=v4.8">

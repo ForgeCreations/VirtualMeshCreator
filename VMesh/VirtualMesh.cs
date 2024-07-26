@@ -1,9 +1,8 @@
-﻿using ObjLoader;
-using System;
+﻿using System;
 using System.Collections.Generic;
+using System.Diagnostics;
 using System.IO;
 using System.Linq;
-using System.Text.RegularExpressions;
 using System.Threading.Tasks;
 using VirtualMeshCreator.Math;
 using VirtualMeshCreator.Utility;
@@ -20,30 +19,36 @@ namespace VirtualMeshCreator.VMesh
         {
             Console.WriteLine("\n Begin Building Virtual Mesh\n\n");
 
+            clusters = new Cluster[0];
+            groups = new ClusterGroup[0];
+
             Vector3[] pos = mesh.vertices;
             int[] idx = mesh.triangles;
+            Console.WriteLine($"Initial Num Vertices: {pos.Length}, Initial Num Triangles: {idx.Length / 3}\n");
 
             Console.WriteLine("Fixing up Mesh");
 
-            //Use a simplifier and set a target greater than the number of triangles to remove duplicate vertices and triangles
+            // Use a simplifier and set a target greater than the number of triangles to remove duplicate vertices and triangles
             MeshSimplifier simplifier = new MeshSimplifier(pos, pos.Length, idx, idx.Length);
             simplifier.Simplify(idx.Length);
             Array.Resize(ref pos, simplifier.RemainingVertexCount);
             Array.Resize(ref idx, simplifier.RemainingTriangleCount * 3);
-            Console.WriteLine($"Num Vertices: {pos.Length}, Num Triangles: {idx.Length / 3}\n\n");
+            Console.WriteLine($"Cur Num Vertices: {pos.Length}, Cur Num Triangles: {idx.Length / 3}\n");
 
             Console.WriteLine("Clustering Triangles");
 
-            //Create clusters from triangles
+            // Create clusters from triangles
             Cluster.ClusterTriangles(ref pos, ref idx, ref clusters);
 
             int levelOffset = 0, mipLevel = 0;
 
             Console.WriteLine("Begin Building DAG Tree\n");
+            Stopwatch vm_sw = Stopwatch.StartNew();
+            vm_sw.Start();
             while(true)
             {
-                Console.Write($"### Level {mipLevel} ###\n");
-                Console.Write($"Num Clusters: {clusters.Length - levelOffset}\n");
+                Console.WriteLine($"### Level {mipLevel} ###\n");
+                Console.WriteLine($"Num Clusters: {clusters.Length - levelOffset}\n");
                 LogClusterSize(ref clusters, levelOffset, clusters.Length);
                 
                 int numLevelClusters = clusters.Length - levelOffset;
@@ -53,13 +58,13 @@ namespace VirtualMeshCreator.VMesh
                 int prevClusterNum = clusters.Length;
                 int preGroupNum = groups.Length;
 
-                //Group Clusters
+                // Group Clusters
                 Console.WriteLine("Grouping Clusters");
                 ClusterGroup.GroupClusters(ref clusters, (uint)levelOffset, numLevelClusters, ref groups, mipLevel);
                 Console.WriteLine($"Num Groups: {groups.Length - preGroupNum}\n");
                 LogGroupSize(ref groups, preGroupNum, groups.Length);
 
-                //Merge and Simplify clusters within groups to generate upper-level clusters
+                // Merge and Simplify clusters within groups to generate upper-level clusters
                 Console.WriteLine("Building Parent Clusters: ");
                 for(int i = preGroupNum; i < groups.Length; i++)
                 {
@@ -72,10 +77,11 @@ namespace VirtualMeshCreator.VMesh
                 Console.WriteLine("\n");
             }
             numMipLevels = mipLevel + 1;
-
+            vm_sw.Stop();
             Console.WriteLine("End Building DAG Tree\n");
-            Console.WriteLine($"Total Clusters: {clusters.Length}\n\n");
-
+            Console.WriteLine($"Total Clusters: {clusters.Length}");
+            Console.WriteLine($"Num Mip Levels: {numMipLevels}");
+            Console.WriteLine($"Virtual Mesh Buld Time(ms): {vm_sw.ElapsedMilliseconds}\n\n");
             Console.WriteLine("# End Building Virtual Mesh\n\n");
         }
 
@@ -92,7 +98,7 @@ namespace VirtualMeshCreator.VMesh
 
             while(true)
             {
-                //Grab highest error cluster to replace to reduce cut error
+                // Grab highest error cluster to replace to reduce cut error
                 Cluster cluster = clusters[heap.Top()];
 
                 if(cluster.mipLevel == 0)
@@ -102,7 +108,7 @@ namespace VirtualMeshCreator.VMesh
 
                 bool bHitTarget = heap.Num() * Cluster.CLUSTER_SIZE > targetNumTris || MinError < targetError;
 
-                //Overshoot the target by TargetOvershoot number of triangles. This allows granular edge collapses to better minimize error to the target.
+                // Overshoot the target by TargetOvershoot number of triangles. This allows granular edge collapses to better minimize error to the target.
                 if(targetOvershoot > 0 && bHitTarget && !hitTargetBefore)
                 {
                     targetNumTris = heap.Num() * (uint)Cluster.CLUSTER_SIZE + targetOvershoot;
@@ -119,9 +125,9 @@ namespace VirtualMeshCreator.VMesh
                 //Console.WriteLine(cluster.lodError <= MinError);
                 MinError = cluster.lodError;
 
-                foreach(uint Child in groups[cluster.generatingGroupID].clusters)
+                foreach(int Child in groups[cluster.generatingGroupID].clusters)
                 {
-                    if(!heap.IsPresent(Child))
+                    if(!heap.IsPresent((uint)Child))
                     {
                         Cluster ChildCluster = clusters[Child];
 
@@ -129,7 +135,7 @@ namespace VirtualMeshCreator.VMesh
                         //Console.WriteLine(ChildCluster.mipLevel < cluster.mipLevel);
                         //check(ChildCluster.LODError <= MinError);
                         //Console.WriteLine(ChildCluster.lodError <= MinError);
-                        heap.Add(-ChildCluster.lodError, Child);
+                        heap.Add(-ChildCluster.lodError, (uint)Child);
                     }
                 }
             }
@@ -144,30 +150,30 @@ namespace VirtualMeshCreator.VMesh
             FileStream file = new FileStream(exportPath + "/" + fileName + FILE_EXTENSION, FileMode.Create);
             using(BinaryWriter writer = new BinaryWriter(file))
             {
-                writer.Write(clusters.Length); //Num Clusters
-                writer.Write(groups.Length); //Num Groups
-                writer.Write(0); //group data ofs
+                writer.Write(clusters.Length); // Num Clusters
+                writer.Write(groups.Length); // Num Groups
+                writer.Write(0); // Group Data Offset
                 writer.Write(0);
                 foreach(Cluster cluster in clusters)
                 {
-                    writer.Write(cluster.vertices.Length); //Num Verticies
-                    writer.Write(0); //v data ofs
-                    writer.Write(cluster.triangles.Length / 3); //Num Triangles
-                    writer.Write(0); //t data ofs
+                    writer.Write(cluster.vertices.Length); // Num Verticies
+                    writer.Write(0); // Vertex Data Offset
+                    writer.Write(cluster.triangles.Length / 3); // Num Triangles
+                    writer.Write(0); // Triangle Data Offset
 
-                    //Bounds
+                    // Bounds
                     writer.Write((uint)cluster.sphereBounds.center.x);
                     writer.Write((uint)cluster.sphereBounds.center.y);
                     writer.Write((uint)cluster.sphereBounds.center.z);
                     writer.Write((uint)cluster.sphereBounds.radius);
 
-                    //Lod Bounds
+                    // LOD Bounds
                     writer.Write((uint)cluster.lodBounds.center.x);
                     writer.Write((uint)cluster.lodBounds.center.y);
                     writer.Write((uint)cluster.lodBounds.center.z);
                     writer.Write((uint)cluster.lodBounds.radius);
 
-                    //Parent LOD Bounds
+                    // Parent LOD Bounds
                     Sphere parentLodBounds = groups[cluster.groupID].lodBounds;
                     float max_parent_lod_error = groups[cluster.groupID].maxParentLODError;
                     writer.Write((uint)parentLodBounds.center.x);
@@ -181,17 +187,17 @@ namespace VirtualMeshCreator.VMesh
                     writer.Write(cluster.mipLevel);
                 }
 
-                //packed_data[2] = packed_data.size(); //group data ofs
+                //PackedData[2] = PackedData.Length; // Group Data Offset
                 writer.Write(0);
                 writer.Write(0);
                 foreach(ClusterGroup group in groups)
                 {
-                    writer.Write(group.clusters.Length); //num cluster
-                    writer.Write(0); //cluter data ofs
+                    writer.Write(group.clusters.Length); // Num Clusters
+                    writer.Write(0); // Cluter Data Offset
                     writer.Write((uint)group.maxParentLODError);
                     writer.Write(0);
 
-                    //Lod Bounds
+                    // LOD Bounds
                     writer.Write((uint)group.lodBounds.center.x);
                     writer.Write((uint)group.lodBounds.center.y);
                     writer.Write((uint)group.lodBounds.center.z);
@@ -201,7 +207,7 @@ namespace VirtualMeshCreator.VMesh
                 foreach(Cluster cluster in clusters)
                 {
                     int ofs = 4 + 20 * i;
-                    //packed_data[ofs + 1] = packed_data.size();
+                    //PackedData[Offset + 1] = PackedData.Length;
                     foreach(Vector3 p in cluster.vertices)
                     {
                         writer.Write((uint)p.x);
@@ -209,7 +215,7 @@ namespace VirtualMeshCreator.VMesh
                         writer.Write((uint)p.z);
                     }
 
-                    //packed_data[ofs + 3] = packed_data.size();
+                    //PackedData[Offset + 3] = PackedData.Length;
                     for(int t = 0; t < cluster.triangles.Length / 3; t++)
                     {
                         //Triangle Data
@@ -219,8 +225,8 @@ namespace VirtualMeshCreator.VMesh
                         //assert(i0 < 256 && i1 < 256 && i2 < 256);
                         //Console.WriteLine(i0 < 256 && i1 < 256 && i2 < 256);
 
-                        int packed_tri = i0 | (i1 << 8) | (i2 << 16);
-                        writer.Write(packed_tri);
+                        int PackedTriangle = i0 | (i1 << 8) | (i2 << 16);
+                        writer.Write(PackedTriangle);
                     }
                     i++;
                 }

@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Diagnostics;
 using System.Linq;
 using VirtualMeshCreator.Math;
 using VirtualMeshCreator.Utility;
@@ -21,17 +22,66 @@ public class TessellationTable
     
     public TessellationTable()
     {
-        
+        /*
+         * NumPatterns = (MaxTessFactor + 2) choose 3
+         * NumPatterns = 1/6 * N(N + 1) (N + 2)
+         * = 816
+        */
+
+        HashTable.Clear(MaxNumTris, MaxNumTris);
+
+        uint NumOffsets = MaxTessFactor * MaxTessFactor * MaxTessFactor;
+        OffsetTable.Append(new Vector2Int((int)NumOffsets + 1, (int)NumOffsets + 1));
+
+        for(uint i = 0; i < NumOffsets; i++)
+        {
+            uint[] TessFactors = new uint[3];
+            TessFactors[0] = i & 15 + 1;
+            TessFactors[1] = (i >> 4) & 15 + 1;
+            TessFactors[2] = (i >> 8) & 15 + 1;
+
+            FirstVert = Verts.Length;
+            FirstTri = Indexes.Length;
+
+            OffsetTable[i].x = FirstVert;
+            OffsetTable[i].y = FirstTri;
+
+            // TessFactors in descending order to reduce size of table.
+            if(TessFactors[0] >= TessFactors[1] && TessFactors[1] >= TessFactors[2])
+            {
+                // RecursiveSplit(TessFactors);
+                UniformTessellateAndSnap(TessFactors);
+            }
+        }
+
+        // One more on the end so we can do Num = Offset[i + 1] - Offset[i];
+        OffsetTable[NumOffsets].x = Verts.Length;
+        OffsetTable[NumOffsets].y = Indexes.Length;
+
+        HashTable.Free();
     }
     
     public int GetNumVerts(int Pattern)
     {
-        return OffsetTable[Pattern + 1].x -OffsetTable[Pattern].x;
+        return OffsetTable[Pattern + 1].x - OffsetTable[Pattern].x;
     }
     
     public int GetNumTris(int Pattern)
     {
-        return OffsetTable[Pattern + 1].y -OffsetTable[Pattern].y;
+        return OffsetTable[Pattern + 1].y - OffsetTable[Pattern].y;
+    }
+
+    public uint GetPattern(uint[] TessFactors)
+    {
+        Debug.Assert(0 < TessFactors[0] && TessFactors[0] <= MaxTessFactor);
+        Debug.Assert(0 < TessFactors[1] && TessFactors[1] <= MaxTessFactor);
+        Debug.Assert(0 < TessFactors[2] && TessFactors[2] <= MaxTessFactor);
+
+        if(TessFactors[0] < TessFactors[1]) ArrayUtils.Swap(ref TessFactors[0], ref TessFactors[1]);
+        if(TessFactors[0] < TessFactors[2]) ArrayUtils.Swap(ref TessFactors[0], ref TessFactors[2]);
+        if(TessFactors[1] < TessFactors[2]) ArrayUtils.Swap(ref TessFactors[1], ref TessFactors[2]);
+
+        return TessFactors[0] - 1 + (TessFactors[1] - 1) * 16 + (TessFactors[2] - 1) * 256;
     }
     
     private uint[] GetBarycentrics(uint Vert)
@@ -43,35 +93,35 @@ public class TessellationTable
         return Barycentrics;
     }
     
-    //Average barycentric == average cartesian
+    // Average barycentric == average cartesian
     
     private float LengthSquared(int[] Barycentrics, uint[] TessFactors)
     {
-        //Barycentric displacement vector:
+        // Barycentric displacement vector:
         // 0 = x + y + z
         
         Vector3Int Norm = new Vector3Int(Barycentrics) / (int)BarycentricMax;
         
-        //Length of displacement
-        //[Schindler and Chen 2012, "Barycentric Coordinates in Olympiad Geometry" https://web.evanchen.cc/handouts/bary/bary-full.pdf]
+        // Length of displacement
+        // [Schindler and Chen 2012, "Barycentric Coordinates in Olympiad Geometry" https://web.evanchen.cc/handouts/bary/bary-full.pdf]
         return -Norm.x * Norm.y * (int)Math.Pow(TessFactors[0], 2) -Norm.y * Norm.z * (int)Math.Pow(TessFactors[1], 2) -Norm.z * Norm.x * (int)Math.Pow(TessFactors[2], 2);
     }
     
-    //Snap to exact TessFactor at the edges
+    // Snap to exact TessFactor at the edges
     private void SnapAtEdges(uint[] Barycentrics, uint[] TessFactors)
     {
         for(uint i = 0; i < 3; i++)
         {
             uint e1 = (uint)(1 << (int)i) & 3;
             
-            //Am I on this edge?
+            // Am I on this edge?
             if(Barycentrics[i] + Barycentrics[e1] == BarycentricMax)
             {
-                //Snap toward min barycentric means snapping mirrors. Adjacent patches will thus match.
+                // Snap toward min barycentric means snapping mirrors. Adjacent patches will thus match.
                 uint MinIndex = Barycentrics[i] < Barycentrics[i] ? i : e1;
                 uint MaxIndex = Barycentrics[i] >= Barycentrics[i] ? i : e1;
                 
-                //Fixed point round
+                // Fixed point round
                 uint Snapped = (Barycentrics[MinIndex] * TessFactors[i] + (BarycentricMax / 2) - 1) & ~(BarycentricMax - 1);
                 
                 Barycentrics[MinIndex] = Snapped / TessFactors[i];
@@ -83,9 +133,10 @@ public class TessellationTable
 	private uint AddVert(uint Vert)
 	{
 	    uint Hash = MeshUtility.MurmurFinalize32(Vert);
-        /*//Find if there already exists one
-        //uint Index;
-        foreach(uint Index in HashTable[Hash])
+
+        // Find if there already exists one
+        uint Index;
+        for(Index = HashTable.First(Hash); HashTable.IsValid(Index); HashTable.Next(Index))
 	    {
 	        if(Verts[FirstVert + Index] == Vert)
 	        {
@@ -100,8 +151,7 @@ public class TessellationTable
 	        HashTable.Add(Hash, Index);
 	    }
 	    
-	    return Index;*/
-        return Hash;
+	    return Index;
 	}
 	
 	private void SplitEdge(uint TriIndex, uint EdgeIndex, uint LeftFactor, uint RightFactor, uint[] TessFactors)
@@ -127,9 +177,9 @@ public class TessellationTable
     	
     #if false
     	//Sort verts for deterministic split
-    	uint v = new uint[2];
-    	v[0] = Math.Min(Verts[FirstVert + i0], Verts[FirstVert + i1]);
-    	v[1] = Math.Max(Verts[FirstVert + i0], Verts[FirstVert + i1]);
+    	uint[] v = new uint[2];
+    	v[0] = System.Math.Min(Verts[FirstVert + i0], Verts[FirstVert + i1]);
+    	v[1] = System.Math.Max(Verts[FirstVert + i0], Verts[FirstVert + i1]);
     	
     	uint OriginallyZero = 0;
     	int[] Barycentrics = new int[2];
@@ -137,7 +187,7 @@ public class TessellationTable
     	{
     	    Barycentrics[j] = GetBarycentrics(v[j]);
     	    
-    	    //Count how many were zero originally.
+    	    // Count how many were zero originally.
     	    OriginallyZero += Barycentrics[j].X == 0 ? 1 : 0;
     	    OriginallyZero += Barycentrics[j].Y == 0 ? 4 : 0;
     	    OriginallyZero += Barycentrics[j].Z == 0 ? 16 : 0;
@@ -150,13 +200,13 @@ public class TessellationTable
         
         for(uint i = 0; i < 3; i++)
         {
-            //If both verts were originally zero then force split to be zero as well.
+            // If both verts were originally zero then force split to be zero as well.
             if((OriginallyZero & 3) == 2)
                 SplitBarycentrics[i] = 0;
             OriginallyZero >>= 2;
         }
     #else
-        //Sort verts for deterministic split
+        // Sort verts for deterministic split
         //uint[] SplitBarycentrics = GetBarycentrics(Math.Min(Verts[FirstVert + i0], Verts[FirstVert + i1])) * LeftFactor + GetBarycentrics(Math.Max(Verts[FirstVert + i0], Verts[FirstVert + i1])) * RightFactor;
         uint[] SplitBarycentrics = GetBarycentrics(Math.Min(Verts[FirstVert + i0], Verts[FirstVert + i1]));
         
@@ -177,33 +227,28 @@ public class TessellationTable
 
 	    SnapAtEdges(SplitBarycentrics, TessFactors);
 
-        //check(SplitBarycentrics[0] + SplitBarycentrics[1] + SplitBarycentrics[2] == BarycentricMax);
-        Console.WriteLine(SplitBarycentrics[0] + SplitBarycentrics[1] + SplitBarycentrics[2] == BarycentricMax);
-        //check(!bOriginallyZero[0] || SplitBarycentrics[0] == 0);
-        Console.WriteLine(!bOriginallyZero[0] || SplitBarycentrics[0] == 0);
-        //check(!bOriginallyZero[1] || SplitBarycentrics[1] == 0);
-        Console.WriteLine(!bOriginallyZero[1] || SplitBarycentrics[1] == 0);
-        //check(!bOriginallyZero[2] || SplitBarycentrics[2] == 0);
-        Console.WriteLine(!bOriginallyZero[2] || SplitBarycentrics[2] == 0);
+        Debug.Assert(SplitBarycentrics[0] + SplitBarycentrics[1] + SplitBarycentrics[2] == BarycentricMax);
+        Debug.Assert(!bOriginallyZero[0] || SplitBarycentrics[0] == 0);
+        Debug.Assert(!bOriginallyZero[1] || SplitBarycentrics[1] == 0);
+        Debug.Assert(!bOriginallyZero[2] || SplitBarycentrics[2] == 0);
 
 	    uint SplitVert = SplitBarycentrics[0] | (SplitBarycentrics[1] << 16);
 	    uint SplitIndex = AddVert(SplitVert);
 
-        //checkf(SplitIndex != i0 && SplitIndex != i1 && SplitIndex != i2, TEXT("Degenerate triangle generated") );
-        Console.WriteLine("Degenerate Triangle Generated: " + (SplitIndex != i0 && SplitIndex != i1 && SplitIndex != i2));
+        Debug.Assert(SplitIndex != i0 && SplitIndex != i1 && SplitIndex != i2, "Degenerate Triangle Generated");
 	
-	    //Replace v0
+	    // Replace v0
 	    Indexes.ToList().Add(SplitIndex | (i1 << 10) | (i2 << 20));
 
-	    //Replace v1
+	    // Replace v1
 	    Indexes[TriIndex] = i0 | (SplitIndex << 10) | (i2 << 20);
 	}
 
-    //Longest edge bisection. Uses Diagsplit rules instead of exact bisection.
+    // Longest edge bisection. Uses Diagsplit rules instead of exact bisection.
 	private void RecursiveSplit(uint[] TessFactors)
 	{
         // Start with patch triangle
-        Verts.ToList().Add(BarycentricMax + 0);  // Avoids TArray:Add grabbing reference to constexpr and forcing ODR-use.
+        Verts.ToList().Add(BarycentricMax + 0);  // Avoids TArray: Add grabbing reference to constexpr and forcing ODR-use.
         Verts.ToList().Add(BarycentricMax << 16);
         Verts.ToList().Add(0);
 
@@ -233,7 +278,7 @@ public class TessellationTable
             }
 
             uint EdgeIndex = (uint)Math.Max((uint)Math.Max(EdgeLength2[0], EdgeLength2[1]), EdgeLength2[2]);
-            //check(EdgeLength2[EdgeIndex] >= 0.0f);
+            Debug.Assert(EdgeLength2[EdgeIndex] >= 0.0f);
 
             uint NumEdgeSplits = (uint)Math.Round(Math.Sqrt(EdgeLength2[EdgeIndex]));
             uint HalfSplit = NumEdgeSplits >> 1;
@@ -337,71 +382,71 @@ public class TessellationTable
                 }
 
 #if true
-			for(int i = 0; i < 3; i++)
-			{
-				int e0 = i;
-				int e1 = (1 << e0) & 3;
-				int e2 = (1 << e1) & 3;
+			    for(int i = 0; i < 3; i++)
+			    {
+				    int e0 = i;
+				    int e1 = (1 << e0) & 3;
+				    int e2 = (1 << e1) & 3;
 
-				if(Barycentrics[e0] == 0 || Barycentrics[e1] == 0 || Barycentrics[e2] == 0 )
-					continue;
+				    if(Barycentrics[e0] == 0 || Barycentrics[e1] == 0 || Barycentrics[e2] == 0 )
+					    continue;
 
-				uint Sum = Barycentrics[e0] + Barycentrics[e1];
+				    uint Sum = Barycentrics[e0] + Barycentrics[e1];
 
 #if false
-				//Snap toward min barycentric means snapping mirrors.
-				uint MinIndex = Barycentrics[ e0 ] <  Barycentrics[ e1 ] ? e0 : e1;
-				uint MaxIndex = Barycentrics[ e0 ] >= Barycentrics[ e1 ] ? e0 : e1;
+				    // Snap toward min barycentric means snapping mirrors.
+				    uint MinIndex = Barycentrics[e0] <  Barycentrics[e1] ? e0 : e1;
+				    uint MaxIndex = Barycentrics[e0] >= Barycentrics[e1] ? e0 : e1;
 
-				//Fixed point round
-				uint Snapped = ( Barycentrics[ MinIndex ] * TessFactors[i] + (BarycentricMax / 2) - 1 ) & ~( BarycentricMax - 1 );
+				    // Fixed point round
+				    uint Snapped = (Barycentrics[MinIndex] * TessFactors[i] + (BarycentricMax / 2) - 1 ) & ~(BarycentricMax - 1);
 
-				Barycentrics[MinIndex] = FMath::Min( Sum, Snapped / TessFactors[i]);
-				Barycentrics[MaxIndex] = Sum - Barycentrics[MinIndex];
+				    Barycentrics[MinIndex] = Math.Min(Sum, Snapped / TessFactors[i]);
+				    Barycentrics[MaxIndex] = Sum - Barycentrics[MinIndex];
 
-				if(Barycentrics[MinIndex] > Barycentrics[MaxIndex])
-				{
-					Barycentrics[e0] = Sum / 2;
-					Barycentrics[e1] = Sum - Barycentrics[e0];
-				}
+				    if(Barycentrics[MinIndex] > Barycentrics[MaxIndex])
+				    {
+					    Barycentrics[e0] = Sum / 2;
+					    Barycentrics[e1] = Sum - Barycentrics[e0];
+				    }
 #else
-				//Fixed point round
-				uint Snapped = (Barycentrics[e0] * TessFactors[i] + (BarycentricMax / 2) - 1) & ~(BarycentricMax - 1);
+				    // Fixed point round
+				    uint Snapped = (Barycentrics[e0] * TessFactors[i] + (BarycentricMax / 2) - 1) & ~(BarycentricMax - 1);
 
-				Barycentrics[e0] = Math.Min(Sum, Snapped / TessFactors[i]);
-				Barycentrics[e1] = Sum - Barycentrics[ e0 ];
+				    Barycentrics[e0] = Math.Min(Sum, Snapped / TessFactors[i]);
+				    Barycentrics[e1] = Sum - Barycentrics[ e0 ];
 #endif
-			}
+			    }
 #endif
 
 #if true
-			//Snap verts to the edge if they are close.
-			if(Barycentrics[0] != 0 && Barycentrics[1] != 0 && Barycentrics[2] != 0 )
-			{
-				// Find closest point on edge
-				int b0 = (int)Math.Min(Math.Min(Barycentrics[0], Barycentrics[1]), Barycentrics[2]);
-				int b1 = (1 << b0) & 3;
-				int b2 = (1 << b1) & 3;
+			    // Snap verts to the edge if they are close.
+			    if(Barycentrics[0] != 0 && Barycentrics[1] != 0 && Barycentrics[2] != 0 )
+			    {
+				    // Find closest point on edge
+				    int b0 = (int)Math.Min(Math.Min(Barycentrics[0], Barycentrics[1]), Barycentrics[2]);
+				    int b1 = (1 << b0) & 3;
+				    int b2 = (1 << b1) & 3;
 
-				//if( Barycentrics[ b1 ] < Barycentrics[ b2 ] )
-				//	Swap( b1, b2 );
+				    //if(Barycentrics[b1] < Barycentrics[b2])
+				    //	Swap( b1, b2 );
 
-				uint Sum = Barycentrics[ b1 ] + Barycentrics[ b2 ];
+				    uint Sum = Barycentrics[ b1 ] + Barycentrics[ b2 ];
 
-				uint[] ClosestEdgePoint = new uint[3];
-				ClosestEdgePoint[b0] = 0;
-				ClosestEdgePoint[b1] = (Barycentrics[b1] * BarycentricMax) / Sum;
-				ClosestEdgePoint[b2] = BarycentricMax - ClosestEdgePoint[b1];
+				    uint[] ClosestEdgePoint = new uint[3];
+				    ClosestEdgePoint[b0] = 0;
+				    ClosestEdgePoint[b1] = Barycentrics[b1] * BarycentricMax / Sum;
+				    ClosestEdgePoint[b2] = BarycentricMax - ClosestEdgePoint[b1];
 
-				//Want edge point in its final position so we get the correct distance.
-				SnapAtEdges(ClosestEdgePoint, TessFactors);
+				    // Want edge point in its final position so we get the correct distance.
+				    SnapAtEdges(ClosestEdgePoint, TessFactors);
 
-				float DistSqr = LengthSquared(ArrayUtils.Subtract(Barycentrics, ClosestEdgePoint), TessFactors);
-				if(DistSqr < 0.25f)
-				{
-					Barycentrics = ClosestEdgePoint;
-				}
-			}
+				    float DistSqr = LengthSquared(ArrayUtils.Subtract(Barycentrics, ClosestEdgePoint), TessFactors);
+				    if(DistSqr < 0.25f)
+				    {
+					    Barycentrics = ClosestEdgePoint;
+				    }
+			    }
 #endif
 
                 SnapAtEdges(Barycentrics, TessFactors);
@@ -409,7 +454,7 @@ public class TessellationTable
                 TriVerts[Corner] = Barycentrics[0] | (Barycentrics[1] << 16);
             }
 
-            //Degenerate
+            // Degenerate
             if(TriVerts[0] == TriVerts[1] || TriVerts[1] == TriVerts[2] || TriVerts[2] == TriVerts[0])
                 continue;
 

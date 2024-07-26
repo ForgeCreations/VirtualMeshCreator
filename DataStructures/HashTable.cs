@@ -1,6 +1,7 @@
 ﻿using System;
 using System.Collections;
 using System.Collections.Generic;
+using System.Windows.Input;
 
 namespace VirtualMeshCreator.Utility
 {
@@ -47,7 +48,7 @@ namespace VirtualMeshCreator.Utility
             this.indexSize = indexSize;
             hash = new uint[hashSize];
             nextIndex = new uint[indexSize];
-            ArrayUtils.Fill(hash, uint.MaxValue);
+            hash.Fill(uint.MaxValue);
         }
 
         private void ResizeIndex(uint indexSize)
@@ -60,7 +61,7 @@ namespace VirtualMeshCreator.Utility
 
         public void Clear()
         {
-            ArrayUtils.Fill(hash, uint.MaxValue);
+            hash.Fill(uint.MaxValue);
         }
 
         public void Free()
@@ -81,6 +82,16 @@ namespace VirtualMeshCreator.Utility
             key &= hashMask;
             nextIndex[idx] = hash[key];
             hash[key] = idx;
+        }
+
+        // Safe for many threads to add concurrently.
+        // Not safe to search the table while other threads are adding.
+        // Will not resize. Only use for presized tables.
+        public void AddConcurrent(uint key, int idx)
+        {
+            key &= hashMask;
+            //next_index[idx] = FPlatformAtomics::InterlockedExchange((int)hash[key], idx);
+            nextIndex[idx] = hash[key];
         }
 
         public void Remove(uint key, uint idx)
@@ -121,10 +132,28 @@ namespace VirtualMeshCreator.Utility
                 hash = new uint[hashSize];
                 nextIndex = new uint[indexSize];
 
-                //FMemory::Memset(Hash, 0xff, HashSize * 4);
-                Array.Resize(ref hash, (int)(hashSize * 4));
-                Array.Clear(hash, 0, (int)(hashSize * 4));
+                hash.Fill(uint.MaxValue);
             }
+        }
+
+        public uint First(uint key)
+        {
+            key &= hashMask;
+            return hash[key];
+        }
+
+        public bool IsValid(uint idx)
+        {
+            return idx != uint.MaxValue;
+        }
+
+        public uint Next(uint Index)
+        {
+            //checkSlow(Index < IndexSize);
+            //Console.WriteLine(Index < index_size);
+            //checkSlow(NextIndex[Index] != Index); // check for corrupt tables
+            //Console.WriteLine("Corrupt Tables? [" + (next_index[Index] != Index) + "]");
+            return nextIndex[Index];
         }
 
         public struct Container : IEnumerable<uint>

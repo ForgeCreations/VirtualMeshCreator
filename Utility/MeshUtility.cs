@@ -1,7 +1,6 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.Linq;
-using System.Windows.Media.Media3D;
 using VirtualMeshCreator.Math;
 
 namespace VirtualMeshCreator.Utility
@@ -162,6 +161,26 @@ namespace VirtualMeshCreator.Utility
             z += (Octant >> 2) & 1;
 
             return Hash3(x, y, z);
+        }
+
+        // Separate the original digits with two zeros: 10111 -> 1000001001001, which is used to generate Morton codes
+        public static uint ExpandBits(uint v)
+        {
+            v = (v * 0x00010001u) & 0xFF0000FFu;
+            v = (v * 0x00000101u) & 0x0F00F00Fu;
+            v = (v * 0x00000011u) & 0xC30C30C3u;
+            v = (v * 0x00000005u) & 0x49249249u;
+            return v;
+        }
+
+        // Morton code requires 0 <= x, y , z <= 1
+        public static uint Morton3D(Vector3 p)
+        {
+            uint x = (uint)p.x * 1023, y = (uint)p.y * 1023, z = (uint)p.z * 1023;
+            x = ExpandBits(x);
+            y = ExpandBits(y);
+            z = ExpandBits(z);
+            return (x << 2) | (y << 1) | (z << 1);
         }
     }
 }

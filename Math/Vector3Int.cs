@@ -112,5 +112,15 @@ namespace VirtualMeshCreator.Math
         {
             return v1.x != v2.x || v1.y != v2.y || v1.z != v2.z;
         }
+
+        public override bool Equals(object obj)
+        {
+            return base.Equals(obj);
+        }
+
+        public override int GetHashCode()
+        {
+            return base.GetHashCode();
+        }
     }
 }
