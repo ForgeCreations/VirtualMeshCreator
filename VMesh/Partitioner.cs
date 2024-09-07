@@ -24,7 +24,7 @@ namespace VirtualMeshCreator.VMesh
         public int[] AdjacencyOffset;
     }
 
-    public class Graph
+    public struct Graph
     {
         public List<Dictionary<uint, int>> g;
 
@@ -88,7 +88,7 @@ namespace VirtualMeshCreator.VMesh
             }
         }
 
-        public int BisectGraph(MetisGraph graphData, MetisGraph[] childGraphs, int start, int end)
+        public int BisectGraph(MetisGraph graphData, ref MetisGraph[] childGraphs, int start, int end)
         {
             Debug.Assert(end - start == graphData.Num);
 
@@ -104,23 +104,24 @@ namespace VirtualMeshCreator.VMesh
             int[] part = new int[graphData.Num];
 
             int nw = 1, npart = 2, ncut = 0;
-            float[] part_weight = {
+            float[] part_weight =
+            {
                 (expNumParts >> 1) / expNumParts,
                 1.0f - ((expNumParts >> 1) / expNumParts)
             };
 
-            int res = METIS.PartGraphRecursive(
+            int res = METIS.METIS_PartGraphRecursive(
                 ref graphData.Num,
                 ref nw,
                 graphData.AdjacencyOffset,
                 graphData.Adjacency,
-                null, //Vertex Weights
-                null, //Vertex Size
+                null, // Vertex Weights
+                null, // Vertex Size
                 graphData.AdjacencyCost,
                 ref npart,
-                part_weight, //Partition Weight
+                part_weight, // Partition Weight
                 null,
-                null, //Options
+                null, // Options
                 ref ncut,
                 part
             );
@@ -152,7 +153,7 @@ namespace VirtualMeshCreator.VMesh
             }
             int split = l;
 
-            int[] size = { split, graphData.Num - split };
+            int[] size = new int[2] { split, graphData.Num - split };
             Debug.Assert(size[0] >= 1 && size[1] >= 1);
 
             if(size[0] <= maxPartSize && size[1] <= maxPartSize)
@@ -167,10 +168,10 @@ namespace VirtualMeshCreator.VMesh
                 {
                     childGraphs[i] = new MetisGraph
                     {
+                        Num = size[i],
                         Adjacency = new int[graphData.Adjacency.Length >> 1],
                         AdjacencyCost = new int[graphData.AdjacencyCost.Length >> 1],
                         AdjacencyOffset = new int[size[i] + 1],
-                        Num = size[i]
                     };
                 }
 
@@ -204,7 +205,7 @@ namespace VirtualMeshCreator.VMesh
         public void RecursiveBisectGraph(MetisGraph graphData, int start, int end)
         {
             MetisGraph[] childGraphs = new MetisGraph[0];
-            int split = BisectGraph(graphData, childGraphs, start, end);
+            int split = BisectGraph(graphData, ref childGraphs, start, end);
             // TODO: Fix
             RecursiveBisectGraph(childGraphs[0], start, split);
             RecursiveBisectGraph(childGraphs[1], split, end);
@@ -215,8 +216,7 @@ namespace VirtualMeshCreator.VMesh
             Init(graph.g.Count);
             this.minPartSize = minPartSize;
             this.maxPartSize = maxPartSize;
-            MetisGraph graphData = new MetisGraph();
-            graphData.ToMetisData(ref graph);
+            ToMetisData(graph, out MetisGraph graphData);
             RecursiveBisectGraph(graphData, 0, graphData.Num);
             Array.Sort(ranges, ranges.ToList().IndexOf(ranges.First()), graphData.Num);
             for(uint i = 0; i < nodeIDs.Length; i++)
@@ -227,6 +227,28 @@ namespace VirtualMeshCreator.VMesh
         {
             Graph.Adjacency.Append((int)sortTo[AdjIndex]);
             Graph.AdjacencyOffset.Append(Cost);
+        }
+
+        void ToMetisData(Graph graph, out MetisGraph g)
+        {
+            g = new MetisGraph
+            {
+                Num = graph.g.Count,
+                Adjacency = new int[0],
+                AdjacencyCost = new int[0],
+                AdjacencyOffset = new int[0],
+            };
+
+            for(int i = 0; i < graph.g.Count; i++)
+            {
+                g.AdjacencyOffset.Append(g.Adjacency.Length);
+                foreach(KeyValuePair<uint, int> kvp in graph.g[i])
+                {
+                    g.Adjacency.Append((int)kvp.Key);
+                    g.AdjacencyCost.Append(kvp.Value);
+                }
+            }
+            g.AdjacencyOffset.Append(g.Adjacency.Length);
         }
     }
 }

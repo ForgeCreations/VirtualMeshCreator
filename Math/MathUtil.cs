@@ -3,7 +3,7 @@ using System.Runtime.InteropServices;
 
 namespace VirtualMeshCreator.Math
 {
-    public static class MathUtil
+    public static class MathUtils
     {
         // Evil floating point bit level hacking.
         [StructLayout(LayoutKind.Explicit)]

@@ -17,6 +17,7 @@ namespace VirtualMeshCreator.VMesh
 
         public void Build(ref Mesh mesh)
         {
+            Stopwatch buildingTimer = Stopwatch.StartNew();
             Console.WriteLine("\n Begin Building Virtual Mesh\n\n");
 
             clusters = new Cluster[0];
@@ -26,25 +27,29 @@ namespace VirtualMeshCreator.VMesh
             int[] idx = mesh.triangles;
             Console.WriteLine($"Initial Num Vertices: {pos.Length}, Initial Num Triangles: {idx.Length / 3}\n");
 
+            buildingTimer.Reset();
             Console.WriteLine("Fixing up Mesh");
 
+            buildingTimer.Start();
             // Use a simplifier and set a target greater than the number of triangles to remove duplicate vertices and triangles
             MeshSimplifier simplifier = new MeshSimplifier(pos, pos.Length, idx, idx.Length);
             simplifier.Simplify(idx.Length);
             Array.Resize(ref pos, simplifier.RemainingVertexCount);
             Array.Resize(ref idx, simplifier.RemainingTriangleCount * 3);
+            buildingTimer.Stop();
+            Console.WriteLine($"Initial Simplification Process Time: {buildingTimer.ElapsedMilliseconds}ms");
             Console.WriteLine($"Cur Num Vertices: {pos.Length}, Cur Num Triangles: {idx.Length / 3}\n");
-
+            buildingTimer.Reset();
             Console.WriteLine("Clustering Triangles");
-
+            buildingTimer.Start();
             // Create clusters from triangles
             Cluster.ClusterTriangles(ref pos, ref idx, ref clusters);
+            buildingTimer.Stop();
+            Console.WriteLine($"Initial Clustering Process Time: {buildingTimer.ElapsedMilliseconds}ms");
 
             int levelOffset = 0, mipLevel = 0;
 
             Console.WriteLine("Begin Building DAG Tree\n");
-            Stopwatch vm_sw = Stopwatch.StartNew();
-            vm_sw.Start();
             while(true)
             {
                 Console.WriteLine($"### Level {mipLevel} ###\n");
@@ -59,17 +64,25 @@ namespace VirtualMeshCreator.VMesh
                 int preGroupNum = groups.Length;
 
                 // Group Clusters
+                buildingTimer.Reset();
                 Console.WriteLine("Grouping Clusters");
+                buildingTimer.Start();
                 ClusterGroup.GroupClusters(ref clusters, (uint)levelOffset, numLevelClusters, ref groups, mipLevel);
+                buildingTimer.Stop();
+                Console.WriteLine($"Cluster Grouping Process Time: {buildingTimer.ElapsedMilliseconds}ms");
                 Console.WriteLine($"Num Groups: {groups.Length - preGroupNum}\n");
                 LogGroupSize(ref groups, preGroupNum, groups.Length);
 
                 // Merge and Simplify clusters within groups to generate upper-level clusters
+                buildingTimer.Reset();
                 Console.WriteLine("Building Parent Clusters: ");
+                buildingTimer.Start();
                 for(int i = preGroupNum; i < groups.Length; i++)
                 {
                     ClusterGroup.BuildParentClusters(ref groups[i], ref clusters);
                 }
+                buildingTimer.Stop();
+                Console.WriteLine($"Cluster Parent Creation Process Time: {buildingTimer.ElapsedMilliseconds}ms");
 
                 levelOffset = prevClusterNum;
                 mipLevel++;
@@ -77,11 +90,9 @@ namespace VirtualMeshCreator.VMesh
                 Console.WriteLine("\n");
             }
             numMipLevels = mipLevel + 1;
-            vm_sw.Stop();
             Console.WriteLine("End Building DAG Tree\n");
-            Console.WriteLine($"Total Clusters: {clusters.Length}");
             Console.WriteLine($"Num Mip Levels: {numMipLevels}");
-            Console.WriteLine($"Virtual Mesh Buld Time(ms): {vm_sw.ElapsedMilliseconds}\n\n");
+            Console.WriteLine($"Total Clusters: {clusters.Length}");
             Console.WriteLine("# End Building Virtual Mesh\n\n");
         }
 

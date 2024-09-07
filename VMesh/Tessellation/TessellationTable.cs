@@ -15,10 +15,10 @@ public class TessellationTable
     public uint[] Verts;
     public uint[] Indexes;
     
-    private int FirstVert;
-	private int FirstTri;
+    private readonly int FirstVert;
+	private readonly int FirstTri;
 
-	private HashTable HashTable;
+	private readonly HashTable HashTable;
     
     public TessellationTable()
     {
@@ -244,7 +244,10 @@ public class TessellationTable
 	    Indexes[TriIndex] = i0 | (SplitIndex << 10) | (i2 << 20);
 	}
 
-    // Longest edge bisection. Uses Diagsplit rules instead of exact bisection.
+    /// <summary>
+    /// Longest edge bisection. Uses Diagsplit rules instead of exact bisection.
+    /// </summary>
+    /// <param name="TessFactors"></param>
 	private void RecursiveSplit(uint[] TessFactors)
 	{
         // Start with patch triangle
@@ -328,7 +331,7 @@ public class TessellationTable
                 Vert order:
                 0    0__1
                 |\   \  |
-                | \   \ |  <= flip triangle
+                | \   \ |  <= Flip Triangle
                 |__\   \|
                 2   1   2
             */
@@ -350,10 +353,12 @@ public class TessellationTable
                 /*
                     b0
                     |\
-                t2  | \  t0
-                    |__\
-                   b2   b1
-                     t1
+                    | \
+                t2  |  \   t0
+                    |   \  
+                    |____\
+                   b2    b1
+                      t1
                 */
                 uint[] Barycentrics = new uint[3];
                 Barycentrics[0] = TessFactors[0] - VertRowCol[Corner, 0];
@@ -380,8 +385,7 @@ public class TessellationTable
 
                     Barycentrics[e0] = BarycentricMax - Barycentrics[e1] - Barycentrics[e2];
                 }
-
-#if true
+    #if true
 			    for(int i = 0; i < 3; i++)
 			    {
 				    int e0 = i;
@@ -392,8 +396,7 @@ public class TessellationTable
 					    continue;
 
 				    uint Sum = Barycentrics[e0] + Barycentrics[e1];
-
-#if false
+    #if false
 				    // Snap toward min barycentric means snapping mirrors.
 				    uint MinIndex = Barycentrics[e0] <  Barycentrics[e1] ? e0 : e1;
 				    uint MaxIndex = Barycentrics[e0] >= Barycentrics[e1] ? e0 : e1;
@@ -409,22 +412,21 @@ public class TessellationTable
 					    Barycentrics[e0] = Sum / 2;
 					    Barycentrics[e1] = Sum - Barycentrics[e0];
 				    }
-#else
+    #else
 				    // Fixed point round
 				    uint Snapped = (Barycentrics[e0] * TessFactors[i] + (BarycentricMax / 2) - 1) & ~(BarycentricMax - 1);
 
 				    Barycentrics[e0] = Math.Min(Sum, Snapped / TessFactors[i]);
 				    Barycentrics[e1] = Sum - Barycentrics[ e0 ];
-#endif
+    #endif
 			    }
-#endif
-
-#if true
+    #endif
+    #if true
 			    // Snap verts to the edge if they are close.
 			    if(Barycentrics[0] != 0 && Barycentrics[1] != 0 && Barycentrics[2] != 0 )
 			    {
 				    // Find closest point on edge
-				    int b0 = (int)Math.Min(Math.Min(Barycentrics[0], Barycentrics[1]), Barycentrics[2]);
+				    int b0 = (int)MathUtils.Min3(Barycentrics[0], Barycentrics[1], Barycentrics[2]);
 				    int b1 = (1 << b0) & 3;
 				    int b2 = (1 << b1) & 3;
 
@@ -447,8 +449,7 @@ public class TessellationTable
 					    Barycentrics = ClosestEdgePoint;
 				    }
 			    }
-#endif
-
+    #endif
                 SnapAtEdges(Barycentrics, TessFactors);
 
                 TriVerts[Corner] = Barycentrics[0] | (Barycentrics[1] << 16);

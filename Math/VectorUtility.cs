@@ -9,7 +9,7 @@ namespace VirtualMeshCreator.Math
         
         public static Vector3 GetUnsafeNormal(in Vector3 n)
         {
-            float Scale = MathUtil.InvSqrt(n.x * n.x + n.y * n.y + n.z * n.z);
+            float Scale = MathUtils.InvSqrt(n.x * n.x + n.y * n.y + n.z * n.z);
             return new Vector3(n.x * Scale, n.y * Scale, n.z * Scale);
         }
 

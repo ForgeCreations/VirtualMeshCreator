@@ -1,7 +1,7 @@
 ﻿using System;
 using System.Collections;
 using System.Collections.Generic;
-using System.Windows.Input;
+using System.Threading;
 
 namespace VirtualMeshCreator.Utility
 {
@@ -90,8 +90,8 @@ namespace VirtualMeshCreator.Utility
         public void AddConcurrent(uint key, int idx)
         {
             key &= hashMask;
-            //next_index[idx] = FPlatformAtomics::InterlockedExchange((int)hash[key], idx);
-            nextIndex[idx] = hash[key];
+            int value = (int)hash[key];
+            nextIndex[idx] = (uint)Interlocked.Exchange(ref value, idx);
         }
 
         public void Remove(uint key, uint idx)
@@ -111,6 +111,44 @@ namespace VirtualMeshCreator.Utility
                     }
                 }
             }
+        }
+
+        // Returns true if key is found.
+        // Index output is the hash table bucket this key is stored in if found.
+        public bool Find(uint Key, out uint Index)
+        {
+            // Zero is reserved as invalid
+            Key++;
+
+            uint NumLoops = 0;
+        
+            for(Index = MeshUtility.MurmurMix(Key); ; Index++)
+            {
+                //Belt and braces safety code to prevent inf loops if tables are malformed.
+                if(++NumLoops > hashSize)
+                {
+                    break;
+                }
+
+                //Index &= HashTableSize - 1;
+                Index = Index % hashSize;
+
+                uint StoredKey = hash[Index];
+                if(StoredKey != Key)
+                {
+                    if(StoredKey != 0)
+                        continue;
+                }
+
+                else
+                {
+                    return true;
+                }
+
+                break;
+            }
+
+            return false;
         }
 
         public void Clear(uint inHashSize, uint inIndexSize)

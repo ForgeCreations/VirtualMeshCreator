@@ -33,7 +33,7 @@ namespace VirtualMeshCreator.VMesh
         public Vector3 QuantizedPosBits = Vector3.zero;
 
         // Edge Hashing, finds the opposite edges that share a vertex, indicating that two triangles are adjacent
-        public static void BuildAdjacencyEdgeLink(ref Vector3[] vertices, ref int[] triangles, out Graph edgeLink)
+        public static void BuildAdjacencyEdgeLink(Vector3[] vertices, int[] triangles, out Graph edgeLink)
         {
             HashTable edge_ht = new HashTable((uint)triangles.Length);
             edgeLink = new Graph();
@@ -58,16 +58,16 @@ namespace VirtualMeshCreator.VMesh
         }
 
         // TODO: After Morton codes are sorted, edges are connected between different connected blocks to ensure grid connectivity.
-        public Graph BuildLocalityLinksTriangles(Vector3[] verts, int[] indexes)
+        public Graph BuildLocalityLinks(Vector3[] verts, int[] indexes)
         {
             Graph graph = new Graph();
             Bounds bounds = new Bounds(verts[0], verts[0]);
-            foreach (Vector3 p in verts)
+            foreach(Vector3 p in verts)
                 bounds += p;
             Vector3 extent = bounds.Max - bounds.Min;
             float maxLength = System.Math.Max(System.Math.Max(extent.x, extent.y), extent.z);
 
-            for (int i = 0; i < indexes.Length / 3; i++)
+            for(int i = 0; i < indexes.Length / 3; i++)
             {
                 Vector3 p0 = verts[indexes[i * 3]];
                 Vector3 p1 = verts[indexes[i * 3] + 1];
@@ -79,6 +79,43 @@ namespace VirtualMeshCreator.VMesh
             }
             return graph;
         }
+
+        public Graph BuildLocalityLinks_FinishedGPT(Vector3[] verts, int[] indexes)
+        {
+            Graph graph = new Graph();
+            Bounds bounds = new Bounds(verts[0], verts[0]);
+            foreach(Vector3 p in verts)
+                bounds += p;
+            Vector3 extent = bounds.Max - bounds.Min;
+            float maxLength = System.Math.Max(System.Math.Max(extent.x, extent.y), extent.z);
+
+            List<(uint morton, int index)> mortonCodes = new List<(uint morton, int index)>();
+
+            for(int i = 0; i < indexes.Length / 3; i++)
+            {
+                Vector3 p0 = verts[indexes[i * 3]];
+                Vector3 p1 = verts[indexes[i * 3 + 1]];
+                Vector3 p2 = verts[indexes[i * 3 + 2]];
+                Vector3 center = (p0 + p1 + p2) * (1.0f / 3.0f);
+                center = (center - bounds.Min) * (1.0f / maxLength);
+
+                uint morton = MeshUtility.Morton3D(center);
+                mortonCodes.Add((morton, i));
+            }
+
+            mortonCodes.Sort((a, b) => a.morton.CompareTo(b.morton));
+
+            for(int i = 0; i < mortonCodes.Count - 1; i++)
+            {
+                uint currentMorton = mortonCodes[i].morton;
+                uint nextMorton = mortonCodes[i + 1].morton;
+
+                graph.AddEdge(currentMorton, nextMorton, 1);
+            }
+
+            return graph;
+        }
+
 
         // Contruct a triangle adjacency graph based on the edge adjacency. The edge weight is 1. When local needs to be added, the adjacency edge needs to be large enough.
         public static void BuildAdjacencyGraph(Graph edgeLink, out Graph graph)
@@ -98,9 +135,10 @@ namespace VirtualMeshCreator.VMesh
 
         public static void ClusterTriangles(ref Vector3[] vertices, ref int[] triangles, ref Cluster[] clusters)
         {
-            BuildAdjacencyEdgeLink(ref vertices, ref triangles, out Graph edgeLink);
+            BuildAdjacencyEdgeLink(vertices, triangles, out Graph edgeLink);
+            Console.WriteLine("[Clustering] Finished Building Adjacency Edge Link Graph");
             BuildAdjacencyGraph(edgeLink, out Graph graph);
-
+            Console.WriteLine("[Clustering] Finished Building Adjacency Graph");
             Partitioner partitioner = new Partitioner();
             partitioner.Partition(graph, CLUSTER_SIZE - 4, CLUSTER_SIZE);
 
@@ -311,8 +349,8 @@ namespace VirtualMeshCreator.VMesh
                 int[] idxes = clusters[kv.Key].triangles;
                 Vector3 p0 = pos[idx[kv.Value]], p1 = pos[idx[MeshUtility.Cycle3(kv.Value)]];
                 edge_ht.Add(MeshUtility.Hash((p0, p1)), i);
-                simplifier.LockPostition(p0);
-                simplifier.LockPostition(p1);
+                simplifier.LockPosition(p0);
+                simplifier.LockPosition(p1);
                 i++;
             }
 
@@ -322,7 +360,7 @@ namespace VirtualMeshCreator.VMesh
 
             max_parent_lod_error = System.Math.Max(max_parent_lod_error, (float)System.Math.Sqrt(simplifier.MaxError));
 
-            Cluster.BuildAdjacencyEdgeLink(ref pos, ref idx, out Graph edgeLink);
+            Cluster.BuildAdjacencyEdgeLink(pos, idx, out Graph edgeLink);
             Cluster.BuildAdjacencyGraph(edgeLink, out Graph graph);
 
             Partitioner partitioner = new Partitioner();

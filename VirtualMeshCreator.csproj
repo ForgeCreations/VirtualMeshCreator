@@ -56,22 +56,33 @@
     <None Include="App.config" />
   </ItemGroup>
   <ItemGroup>
+    <Compile Include="DataStructures\Rendering\FrustumCullData.cs" />
+    <Compile Include="DataStructures\Rendering\ScreenRect.cs" />
     <Compile Include="include\METIS.cs" />
+    <Compile Include="IO\BitPacking.cs" />
     <Compile Include="IO\Compression.cs" />
     <Compile Include="IO\FBitWriter.cs" />
     <Compile Include="Math\DMatrix4x4.cs" />
     <Compile Include="Math\DVector3.cs" />
     <Compile Include="Math\DVector4.cs" />
+    <Compile Include="Math\Internal\float3.cs" />
+    <Compile Include="Math\Internal\float4.cs" />
+    <Compile Include="Math\Internal\int3.cs" />
+    <Compile Include="Math\Internal\int4.cs" />
+    <Compile Include="Math\Internal\uint3.cs" />
+    <Compile Include="Math\Internal\uint4.cs" />
+    <Compile Include="Math\Mathf.cs" />
     <Compile Include="Math\Vector2.cs" />
     <Compile Include="Math\Vector2Int.cs" />
     <Compile Include="Math\Vector3.cs" />
     <Compile Include="Math\Vector3Int.cs" />
     <Compile Include="Math\Vector4.cs" />
     <Compile Include="Program.cs" />
+    <Compile Include="Rendering\HZB.cs" />
+    <Compile Include="Rendering\VisibilityBuffer.cs" />
     <Compile Include="Utility\ArrayUtils.cs" />
     <Compile Include="Utility\Bounds.cs" />
     <Compile Include="DataStructures\HashTable.cs" />
-    <Compile Include="Utility\GraphUtils.cs" />
     <Compile Include="Utility\ListUtils.cs" />
     <Compile Include="DataStructures\LRUCache.cs" />
     <Compile Include="Math\MathUtil.cs" />
@@ -92,6 +103,7 @@
     <Compile Include="VMesh\Partitioner.cs" />
     <Compile Include="VMesh\Encoding\PackedCluster.cs" />
     <Compile Include="VMesh\Encoding\Page.cs" />
+    <Compile Include="VMesh\Streaming\StreamingRequest.cs" />
     <Compile Include="VMesh\Tessellation\TessellationTable.cs" />
     <Compile Include="VMesh\VirtualMesh.cs" />
     <Compile Include="VMesh\Encoding\VirtualMeshEncoder.cs" />

@@ -22,38 +22,43 @@ namespace VirtualMeshCreator.VMesh.Encoding
         StepSize64cm
     }
 
+    public enum NormalPrecision
+    {
+
+    }
+
     public static class VirtualMeshEncoder
     {
-        private const int VIRTUALGEOMETRY_STREAMING_PAGE_GPU_SIZE_BITS =    17;
-        private const uint VIRTUALGEOMETRY_STREAMING_PAGE_GPU_SIZE =        (1u << VIRTUALGEOMETRY_STREAMING_PAGE_GPU_SIZE_BITS);
-        private const uint VIRTUALGEOMETRY_MAX_PAGE_DISK_SIZE =             (VIRTUALGEOMETRY_STREAMING_PAGE_GPU_SIZE * 2);
+        private const int NANOGEO_STREAMING_PAGE_GPU_SIZE_BITS =        17;
+        private const uint NANOGEO_STREAMING_PAGE_GPU_SIZE =            (1u << NANOGEO_STREAMING_PAGE_GPU_SIZE_BITS);
+        private const uint NANOGEO_MAX_PAGE_DISK_SIZE =                 (NANOGEO_STREAMING_PAGE_GPU_SIZE * 2);
 
-        private const int CONSTRAINED_CLUSTER_CACHE_SIZE =                  32;
-        private const int MIN_PAGE_DISTANCE_FOR_RELATIVE_ENCODING =         4; // Don't use relative encoding near root to avoid small dependent batches for little compression win.
+        private const int CONSTRAINED_CLUSTER_CACHE_SIZE =              32;
+        private const int MIN_PAGE_DISTANCE_FOR_RELATIVE_ENCODING =     4; // Don't use relative encoding near root to avoid small dependent batches for little compression win.
 
-        private const uint INVALID_PART_INDEX =                             0xFFFFFFFFu;
-        private const uint INVALID_GROUP_INDEX =                            0xFFFFFFFFu;
-        private const uint INVALID_PAGE_INDEX =                             0xFFFFFFFFu;
+        private const uint INVALID_PART_INDEX =                         0xFFFFFFFFu;
+        private const uint INVALID_GROUP_INDEX =                        0xFFFFFFFFu;
+        private const uint INVALID_PAGE_INDEX =                         0xFFFFFFFFu;
 
-        private const int VIRTUALGEOMETRY_ROOT_PAGE_GPU_SIZE_BITS =         15;
-        private const uint VIRTUALGEOMETRY_ROOT_PAGE_GPU_SIZE =             (1u << VIRTUALGEOMETRY_ROOT_PAGE_GPU_SIZE_BITS);
-        private const int VIRTUALGEOMETRY_GPU_PAGE_HEADER_SIZE =            16;
+        private const int NANOGEO_ROOT_PAGE_GPU_SIZE_BITS =             15;
+        private const uint NANOGEO_ROOT_PAGE_GPU_SIZE =                 (1u << NANOGEO_ROOT_PAGE_GPU_SIZE_BITS);
+        private const int NANOGEO_GPU_PAGE_HEADER_SIZE =                16;
 
-        private const int VIRTUALGEOMETRY_MAX_CLUSTERS_PER_PAGE_BITS =      8;
-        private const int VIRTUALGEOMETRY_MAX_CLUSTERS_PER_PAGE_MASK =      ((1 << VIRTUALGEOMETRY_MAX_CLUSTERS_PER_PAGE_BITS) - 1);
-        private const int VIRTUALGEOMETRY_MAX_CLUSTERS_PER_PAGE =           (1 << VIRTUALGEOMETRY_MAX_CLUSTERS_PER_PAGE_BITS);
-        private const int VIRTUALGEOMETRY_MAX_CLUSTERS_PER_GROUP_BITS =     9;
-        private const int VIRTUALGEOMETRY_MAX_CLUSTERS_PER_GROUP_MASK =     ((1 << VIRTUALGEOMETRY_MAX_CLUSTERS_PER_GROUP_BITS) - 1);
-        private const int VIRTUALGEOMETRY_MAX_CLUSTERS_PER_GROUP =          ((1 << VIRTUALGEOMETRY_MAX_CLUSTERS_PER_GROUP_BITS) - 1);
-        private const int VIRTUALGEOMETRY_MAX_CLUSTERS_PER_GROUP_TARGET =   128;
+        private const int NANOGEO_MAX_CLUSTERS_PER_PAGE_BITS =          8;
+        private const int NANOGEO_MAX_CLUSTERS_PER_PAGE_MASK =          ((1 << NANOGEO_MAX_CLUSTERS_PER_PAGE_BITS) - 1);
+        private const int NANOGEO_MAX_CLUSTERS_PER_PAGE =               (1 << NANOGEO_MAX_CLUSTERS_PER_PAGE_BITS);
+        private const int NANOGEO_MAX_CLUSTERS_PER_GROUP_BITS =         9;
+        private const int NANOGEO_MAX_CLUSTERS_PER_GROUP_MASK =         ((1 << NANOGEO_MAX_CLUSTERS_PER_GROUP_BITS) - 1);
+        private const int NANOGEO_MAX_CLUSTERS_PER_GROUP =              ((1 << NANOGEO_MAX_CLUSTERS_PER_GROUP_BITS) - 1);
+        private const int NANOGEO_MAX_CLUSTERS_PER_GROUP_TARGET =       128;
 
-        private const int VIRTUALGEOMETRY_MAX_CLUSTER_TRIANGLES	=           128;
-        private const int VIRTUALGEOMETRY_MAX_CLUSTER_VERTICES_BITS	=       8;
-        private const int VIRTUALGEOMETRY_MAX_CLUSTER_VERTICES =            (1 << VIRTUALGEOMETRY_MAX_CLUSTER_VERTICES_BITS);
-        private const int VIRTUALGEOMETRY_MAX_CLUSTER_VERTICES_MASK =       ((1 << VIRTUALGEOMETRY_MAX_CLUSTER_VERTICES_BITS) - 1);
+        private const int NANOGEO_MAX_CLUSTER_TRIANGLES	=               128;
+        private const int NANOGEO_MAX_CLUSTER_VERTICES_BITS	=           8;
+        private const int NANOGEO_MAX_CLUSTER_VERTICES =                (1 << NANOGEO_MAX_CLUSTER_VERTICES_BITS);
+        private const int NANOGEO_MAX_CLUSTER_VERTICES_MASK =           ((1 << NANOGEO_MAX_CLUSTER_VERTICES_BITS) - 1);
 
-        private const int VIRTUALGEOMETRY_MAX_CLUSTER_INDICES =             (VIRTUALGEOMETRY_MAX_CLUSTER_TRIANGLES * 3);
-        private const int VIRTUALGEOMETRY_MAX_UVS =                         4;
+        private const int NANOGEO_MAX_CLUSTER_INDICES =                 (NANOGEO_MAX_CLUSTER_TRIANGLES * 3);
+        private const int NANOGEO_MAX_UVS =                             4;
 
         private static LRUCache<int, Page> pageCache;
 
@@ -69,7 +74,7 @@ namespace VirtualMeshCreator.VMesh.Encoding
         public static void Encode(ref VirtualMeshSettings Settings)
         {
             uint MaxRootPages = CalculateMaxRootPages((uint)Settings.TargetMinimumResidencyInKB);
-            Console.WriteLine("Max Root Pages: " + MaxRootPages);
+            Console.WriteLine("[Encoder] Max Root Pages: " + MaxRootPages);
         }
 
         private static void WritePages(Page[] pages, Cluster[] clusters, ClusterGroup[] groups, ClusterGroupPart[] parts)
@@ -112,14 +117,14 @@ namespace VirtualMeshCreator.VMesh.Encoding
             pCluster.BoxBoundsExtent = (cluster.boxBounds.Max - cluster.boxBounds.Min) * 0.5f;
 
             //5
-            //check(NumTexCoords <= VIRTUALGEOMETRY_MAX_UVS);
-            Debug.Assert(VIRTUALGEOMETRY_MAX_UVS <= 4, "UV_Prev encoding only supports up to 4 channels");
+            //check(NumTexCoords <= NANOGEO_MAX_UVS);
+            Debug.Assert(NANOGEO_MAX_UVS <= 4, "UV_Prev encoding only supports up to 4 channels");
         }
 
         private static uint CalculateMaxRootPages(uint TargetResidencyInKB)
         {
             ulong SizeInBytes = TargetResidencyInKB << 10;
-            return (uint)MathUtil.Clamp((SizeInBytes + VIRTUALGEOMETRY_ROOT_PAGE_GPU_SIZE - 1u) >> VIRTUALGEOMETRY_ROOT_PAGE_GPU_SIZE_BITS, 1u, uint.MaxValue);
+            return (uint)MathUtils.Clamp((SizeInBytes + NANOGEO_ROOT_PAGE_GPU_SIZE - 1u) >> NANOGEO_ROOT_PAGE_GPU_SIZE_BITS, 1u, uint.MaxValue);
         }
 
         #region Normal Encoding
@@ -149,8 +154,8 @@ namespace VirtualMeshCreator.VMesh.Encoding
 
             Vector2 Coord = OctahedronEncode(N);
 
-            X = MathUtil.Clamp((uint)(Coord.x * Scale + Bias), 0u, QuantizationMaxValue);
-            Y = MathUtil.Clamp((uint)(Coord.y * Scale + Bias), 0u, QuantizationMaxValue);
+            X = MathUtils.Clamp((uint)(Coord.x * Scale + Bias), 0u, QuantizationMaxValue);
+            Y = MathUtils.Clamp((uint)(Coord.y * Scale + Bias), 0u, QuantizationMaxValue);
         }
 
         static Vector3 OctahedronDecode(int X, int Y, int QuantizationBits)
@@ -159,7 +164,7 @@ namespace VirtualMeshCreator.VMesh.Encoding
             float fx = X * (2.0f / QuantizationMaxValue) - 1.0f;
             float fy = Y * (2.0f / QuantizationMaxValue) - 1.0f;
             float fz = 1.0f - System.Math.Abs(fx) - System.Math.Abs(fy);
-            float t = MathUtil.Clamp(-fz, 0.0f, 1.0f);
+            float t = MathUtils.Clamp(-fz, 0.0f, 1.0f);
             fx += (fx >= 0.0f ? -t : t);
             fy += (fy >= 0.0f ? -t : t);
             return GetUnsafeNormal(new Vector3(fx, fy, fz));
@@ -204,8 +209,8 @@ namespace VirtualMeshCreator.VMesh.Encoding
 
             int[] IntCoordValues = new int[4];
             VectorIntStore(IntCoord, ref IntCoordValues);
-            X = (uint)MathUtil.Clamp(IntCoordValues[0] + ((int)Index & 1), 0, QuantizationMaxValue);
-            Y = (uint)MathUtil.Clamp(IntCoordValues[1] + (((int)Index >> 1) & 1), 0, QuantizationMaxValue);
+            X = (uint)MathUtils.Clamp(IntCoordValues[0] + ((int)Index & 1), 0, QuantizationMaxValue);
+            Y = (uint)MathUtils.Clamp(IntCoordValues[1] + (((int)Index >> 1) & 1), 0, QuantizationMaxValue);
         }
 
         private static void OctahedronEncodePrecise(Vector3 N, ref int X, ref int Y, int QuantizationBits)
@@ -215,8 +220,8 @@ namespace VirtualMeshCreator.VMesh.Encoding
 
             float Scale = 0.5f * QuantizationMaxValue;
             float Bias = 0.5f * QuantizationMaxValue;
-            int NX = MathUtil.Clamp((int)(Coord.x * Scale + Bias), 0, QuantizationMaxValue);
-            int NY = MathUtil.Clamp((int)(Coord.y * Scale + Bias), 0, QuantizationMaxValue);
+            int NX = MathUtils.Clamp((int)(Coord.x * Scale + Bias), 0, QuantizationMaxValue);
+            int NY = MathUtils.Clamp((int)(Coord.y * Scale + Bias), 0, QuantizationMaxValue);
 
             float MinError = 1.0f;
             int BestNX = 0;
