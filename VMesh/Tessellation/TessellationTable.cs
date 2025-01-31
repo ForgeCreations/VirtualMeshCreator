@@ -1,5 +1,4 @@
 using System;
-using System.Collections.Generic;
 using System.Diagnostics;
 using System.Linq;
 using VirtualMeshCreator.Math;
@@ -28,6 +27,7 @@ public class TessellationTable
          * = 816
         */
 
+        HashTable = new HashTable();
         HashTable.Clear(MaxNumTris, MaxNumTris);
 
         uint NumOffsets = MaxTessFactor * MaxTessFactor * MaxTessFactor;
@@ -61,12 +61,12 @@ public class TessellationTable
         HashTable.Free();
     }
     
-    public int GetNumVerts(int Pattern)
+    public int GetNumVerts(uint Pattern)
     {
         return OffsetTable[Pattern + 1].x - OffsetTable[Pattern].x;
     }
     
-    public int GetNumTris(int Pattern)
+    public int GetNumTris(uint Pattern)
     {
         return OffsetTable[Pattern + 1].y - OffsetTable[Pattern].y;
     }
@@ -132,7 +132,7 @@ public class TessellationTable
 	
 	private uint AddVert(uint Vert)
 	{
-	    uint Hash = MeshUtility.MurmurFinalize32(Vert);
+	    uint Hash = TriangleUtils.MurmurFinalize32(Vert);
 
         // Find if there already exists one
         uint Index;
@@ -146,7 +146,7 @@ public class TessellationTable
 	    
 	    if(!HashTable.IsValid(Index))
 	    {
-            Verts.ToList().Add(Vert);
+            Verts.Append(Vert);
             Index = Vert - (uint)FirstVert;
 	        HashTable.Add(Hash, Index);
 	    }
@@ -208,7 +208,7 @@ public class TessellationTable
     #else
         // Sort verts for deterministic split
         //uint[] SplitBarycentrics = GetBarycentrics(Math.Min(Verts[FirstVert + i0], Verts[FirstVert + i1])) * LeftFactor + GetBarycentrics(Math.Max(Verts[FirstVert + i0], Verts[FirstVert + i1])) * RightFactor;
-        uint[] SplitBarycentrics = GetBarycentrics(Math.Min(Verts[FirstVert + i0], Verts[FirstVert + i1]));
+        uint[] SplitBarycentrics = GetBarycentrics(Math.Min(Verts[FirstVert + i0], Verts[FirstVert + i1])).Multiply(LeftFactor).Add(GetBarycentrics(Math.Max(Verts[FirstVert + i0], Verts[FirstVert + i1]))).Multiply(RightFactor);
         
         bool[] bOriginallyZero = new bool[3]
         {
@@ -238,7 +238,7 @@ public class TessellationTable
         Debug.Assert(SplitIndex != i0 && SplitIndex != i1 && SplitIndex != i2, "Degenerate Triangle Generated");
 	
 	    // Replace v0
-	    Indexes.ToList().Add(SplitIndex | (i1 << 10) | (i2 << 20));
+	    Indexes.Append(SplitIndex | (i1 << 10) | (i2 << 20));
 
 	    // Replace v1
 	    Indexes[TriIndex] = i0 | (SplitIndex << 10) | (i2 << 20);
@@ -247,15 +247,14 @@ public class TessellationTable
     /// <summary>
     /// Longest edge bisection. Uses Diagsplit rules instead of exact bisection.
     /// </summary>
-    /// <param name="TessFactors"></param>
 	private void RecursiveSplit(uint[] TessFactors)
 	{
         // Start with patch triangle
-        Verts.ToList().Add(BarycentricMax + 0);  // Avoids TArray: Add grabbing reference to constexpr and forcing ODR-use.
-        Verts.ToList().Add(BarycentricMax << 16);
-        Verts.ToList().Add(0);
+        Verts.Append(BarycentricMax + 0);  // Avoids TArray: Add grabbing reference to constexpr and forcing ODR-use.
+        Verts.Append(BarycentricMax << 16);
+        Verts.Append(0u);
 
-        Indexes.ToList().Add(0 | (1 << 10) | (2 << 20));
+        Indexes.Append((uint)(0 | (1 << 10) | (2 << 20)));
 
         HashTable.Clear();
         HashTable.Add(Verts[0], 0);
@@ -463,7 +462,7 @@ public class TessellationTable
             for(int Corner = 0; Corner < 3; Corner++)
                 VertIndexes[Corner] = AddVert(TriVerts[Corner]);
 
-            Indexes.ToList().Add(VertIndexes[0] | (VertIndexes[1] << 10) | (VertIndexes[2] << 20));
+            Indexes.Append(VertIndexes[0] | (VertIndexes[1] << 10) | (VertIndexes[2] << 20));
         }
     }
 }

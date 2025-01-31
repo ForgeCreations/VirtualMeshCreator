@@ -1,6 +1,4 @@
-﻿using System;
-using System.Collections.Generic;
-using System.Linq;
+﻿using System.Collections.Generic;
 
 namespace VirtualMeshCreator.Utility
 {
@@ -20,6 +18,16 @@ namespace VirtualMeshCreator.Utility
             {
                 list.Capacity = (int)capacity;
             }
+        }
+
+        public static KeyValuePair<TKey, TValue> Find<TKey, TValue>(ref Dictionary<TKey, TValue> dict, TKey key)
+        {
+            if(dict.TryGetValue(key, out TValue value))
+            {
+                return new KeyValuePair<TKey, TValue>(key, value);
+            }
+
+            return new KeyValuePair<TKey, TValue>();
         }
     }
 }

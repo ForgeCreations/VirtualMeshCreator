@@ -24,7 +24,7 @@ namespace VirtualMeshCreator.VMesh
         public int[] AdjacencyOffset;
     }
 
-    public struct Graph
+    public class Graph
     {
         public List<Dictionary<uint, int>> g;
 
@@ -61,30 +61,31 @@ namespace VirtualMeshCreator.VMesh
         /// <summary>
         /// Sort nodes by parition number
         /// </summary>
-        public uint[] nodeIDs;
+        public int[] PartitionIDs;
         /// <summary>
         /// A continuous range of blocks, with the same division within the range
         /// </summary>
-        public Pair<int, int>[] ranges;
-        public uint[] sortTo;
-        public int minPartSize;
-        public int maxPartSize;
+        public Range[] Ranges;
+        public int[] SortedTo;
+        public uint NumElements;
+        public int MinPartitionSize = 0;
+        public int MaxPartitionSize = 0;
 
         public Partitioner()
         {
-            nodeIDs = new uint[0];
-            sortTo = new uint[0];
-            ranges = new Pair<int, int>[0];
+            PartitionIDs = new int[0];
+            SortedTo = new int[0];
+            Ranges = new Range[0];
         }
 
         public void Init(int numNodes)
         {
-            nodeIDs = new uint[numNodes];
-            sortTo = new uint[numNodes];
-            for(uint i = 0; i < numNodes; i++)
+            PartitionIDs = new int[numNodes];
+            SortedTo = new int[numNodes];
+            for(int i = 0; i < numNodes; i++)
             {
-                nodeIDs[i] = i;
-                sortTo[i] = i;
+                PartitionIDs[i] = i;
+                SortedTo[i] = i;
             }
         }
 
@@ -92,51 +93,54 @@ namespace VirtualMeshCreator.VMesh
         {
             Debug.Assert(end - start == graphData.Num);
 
-            if(graphData.Num <= maxPartSize)
+            if(graphData.Num <= MaxPartitionSize)
             {
-                ranges.Append(new Pair<int, int>(start, end));
+                Ranges.Append(new Range((uint)start, (uint)end));
                 return end;
             }
-            int expPartSize = (minPartSize + maxPartSize) / 2;
-            int expNumParts = System.Math.Max(2, (graphData.Num + expPartSize - 1) / expPartSize);
+            int TargetPartitionSize = (MinPartitionSize + MaxPartitionSize) / 2;
+            uint TargetNumPartitions = System.Math.Max(2, Mathf.DivideAndRoundNearest((uint)graphData.Num, (uint)TargetPartitionSize));
 
             int[] swapTo = new int[graphData.Num];
-            int[] part = new int[graphData.Num];
+            PartitionIDs = new int[graphData.Num];
 
-            int nw = 1, npart = 2, ncut = 0;
-            float[] part_weight =
+            int NumContraints = 1, NumPart = 2, EdgesCut = 0;
+            float[] PartitionWeights = new float[2]
             {
-                (expNumParts >> 1) / expNumParts,
-                1.0f - ((expNumParts >> 1) / expNumParts)
+                (TargetNumPartitions >> 1) / TargetNumPartitions,
+                1.0f - ((TargetNumPartitions >> 1) / TargetNumPartitions)
             };
 
-            int res = METIS.METIS_PartGraphRecursive(
-                ref graphData.Num,
-                ref nw,
+            //bool loose = TargetNumPartitions >= 128 || MaxPartitionSize / MinPartitionSize > 1;
+            //bool slow = graphData.Num < 4096;
+
+            int res = METIS.PartGraphRecursive(
+                graphData.Num,
+                NumContraints, // Number of balancing contraints
                 graphData.AdjacencyOffset,
                 graphData.Adjacency,
                 null, // Vertex Weights
-                null, // Vertex Size
-                graphData.AdjacencyCost,
-                ref npart,
-                part_weight, // Partition Weight
+                null, // Vertex sizes for computing the total communication volume
+                graphData.AdjacencyCost, // Edge Weights
+                NumPart,
+                PartitionWeights, // Target partition weight
                 null,
                 null, // Options
-                ref ncut,
-                part
+                EdgesCut,
+                PartitionIDs
             );
             Debug.Assert(res == METIS.METIS_OK);
 
             int l = 0, r = graphData.Num - 1;
             while(l <= r)
             {
-                while(l <= r && part[l] == 0)
+                while(l <= r && PartitionIDs[l] == 0)
                 {
                     swapTo[l] = l;
                     l++;
                 }
 
-                while(l <= r && part[r] == 1)
+                while(l <= r && PartitionIDs[r] == 1)
                 {
                     swapTo[r] = r;
                     r--;
@@ -144,7 +148,7 @@ namespace VirtualMeshCreator.VMesh
 
                 if(l < r)
                 {
-                    ArrayUtils.Swap(nodeIDs, start + l, start + r);
+                    ArrayUtils.Swap(PartitionIDs, start + l, start + r);
                     swapTo[l] = r;
                     swapTo[r] = l;
                     l++;
@@ -156,10 +160,10 @@ namespace VirtualMeshCreator.VMesh
             int[] size = new int[2] { split, graphData.Num - split };
             Debug.Assert(size[0] >= 1 && size[1] >= 1);
 
-            if(size[0] <= maxPartSize && size[1] <= maxPartSize)
+            if(size[0] <= MaxPartitionSize && size[1] <= MaxPartitionSize)
             {
-                ranges.Append(new Pair<int, int>(start, start + split));
-                ranges.Append(new Pair<int, int>(start + split, end));
+                Ranges.Append(new Range((uint)start, (uint)(start + split)));
+                Ranges.Append(new Range((uint)(start + split), (uint)end));
             }
 
             else
@@ -178,7 +182,7 @@ namespace VirtualMeshCreator.VMesh
                 for(int i = 0; i < graphData.Num; i++)
                 {
                     int is_rs = (i >= graphData.Num) ? 1 : 0;
-                    bool b_is_rs = is_rs == 1 ? true : false;
+                    bool b_is_rs = is_rs == 1;
                     int u = swapTo[i];
                     MetisGraph ch = childGraphs[is_rs];
                     ch.AdjacencyOffset.Append(ch.Adjacency.Length);
@@ -214,18 +218,18 @@ namespace VirtualMeshCreator.VMesh
         public void Partition(Graph graph, int minPartSize, int maxPartSize)
         {
             Init(graph.g.Count);
-            this.minPartSize = minPartSize;
-            this.maxPartSize = maxPartSize;
+            MinPartitionSize = minPartSize;
+            MaxPartitionSize = maxPartSize;
             ToMetisData(graph, out MetisGraph graphData);
             RecursiveBisectGraph(graphData, 0, graphData.Num);
-            Array.Sort(ranges, ranges.ToList().IndexOf(ranges.First()), graphData.Num);
-            for(uint i = 0; i < nodeIDs.Length; i++)
-                sortTo[nodeIDs[i]] = i;
+            Array.Sort(Ranges, Ranges.ToList().IndexOf(Ranges.First()), graphData.Num);
+            for(int i = 0; i < PartitionIDs.Length; i++)
+                SortedTo[PartitionIDs[i]] = i;
         }
 
         public void AddAdjacency(ref MetisGraph Graph, uint AdjIndex, int Cost)
         {
-            Graph.Adjacency.Append((int)sortTo[AdjIndex]);
+            Graph.Adjacency.Append(SortedTo[AdjIndex]);
             Graph.AdjacencyOffset.Append(Cost);
         }
 
@@ -239,13 +243,13 @@ namespace VirtualMeshCreator.VMesh
                 AdjacencyOffset = new int[0],
             };
 
-            for(int i = 0; i < graph.g.Count; i++)
+            for(int i = 0; i < graph.g.Count(); i++)
             {
                 g.AdjacencyOffset.Append(g.Adjacency.Length);
-                foreach(KeyValuePair<uint, int> kvp in graph.g[i])
+                foreach(KeyValuePair<uint, int> pair in graph.g[i])
                 {
-                    g.Adjacency.Append((int)kvp.Key);
-                    g.AdjacencyCost.Append(kvp.Value);
+                    g.Adjacency.Append((int)pair.Key);
+                    g.AdjacencyCost.Append(pair.Value);
                 }
             }
             g.AdjacencyOffset.Append(g.Adjacency.Length);

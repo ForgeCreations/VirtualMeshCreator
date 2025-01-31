@@ -1,6 +1,7 @@
 ﻿using System;
 using System.Collections;
 using System.Collections.Generic;
+using System.Diagnostics;
 using System.Threading;
 
 namespace VirtualMeshCreator.Utility
@@ -34,7 +35,7 @@ namespace VirtualMeshCreator.Utility
 
         private void Resize(uint indexSize)
         {
-            Resize(MeshUtility.LowerNearest2Power(indexSize), indexSize);
+            Resize(TriangleUtils.LowerNearest2Power(indexSize), indexSize);
         }
 
         private void Resize(uint hashSize, uint indexSize)
@@ -77,7 +78,7 @@ namespace VirtualMeshCreator.Utility
         {
             if(idx >= indexSize)
             {
-                ResizeIndex(MeshUtility.UpperNearest2Power(idx + 1));
+                ResizeIndex(TriangleUtils.UpperNearest2Power(idx + 1));
             }
             key &= hashMask;
             nextIndex[idx] = hash[key];
@@ -113,25 +114,29 @@ namespace VirtualMeshCreator.Utility
             }
         }
 
-        // Returns true if key is found.
-        // Index output is the hash table bucket this key is stored in if found.
+        /// <summary>
+        /// FInds the specified key and returns the index of the found key.
+        /// </summary>
+        /// <param name="Key">The key to be found.</param>
+        /// <param name="Index">The hash table bucket this key is stored in if found.</param>
+        /// <returns>If the key was found.</returns>
         public bool Find(uint Key, out uint Index)
         {
             // Zero is reserved as invalid
             Key++;
 
             uint NumLoops = 0;
-        
-            for(Index = MeshUtility.MurmurMix(Key); ; Index++)
+            
+            for(Index = TriangleUtils.MurmurMix(Key); ; Index++)
             {
-                //Belt and braces safety code to prevent inf loops if tables are malformed.
+                // Belt and braces safety code to prevent inf loops if tables are malformed.
                 if(++NumLoops > hashSize)
                 {
                     break;
                 }
 
-                //Index &= HashTableSize - 1;
-                Index = Index % hashSize;
+                Index &= hashSize - 1;
+                Index %= hashSize;
 
                 uint StoredKey = hash[Index];
                 if(StoredKey != Key)
@@ -158,10 +163,8 @@ namespace VirtualMeshCreator.Utility
             hashSize = inHashSize;
             indexSize = inIndexSize;
 
-            //check(HashSize > 0);
-            //Console.WriteLine(hashSize > 0);
-            //check(FMath::IsPowerOfTwo(HashSize));
-            //Console.WriteLine(MathUtil.IsPowerOfTwo(hashSize));
+            Debug.Assert(hashSize > 0);
+            Debug.Assert(Math.MathUtils.IsPowerOfTwo(hashSize));
 
             if(indexSize > 0)
             {
@@ -187,10 +190,8 @@ namespace VirtualMeshCreator.Utility
 
         public uint Next(uint Index)
         {
-            //checkSlow(Index < IndexSize);
-            //Console.WriteLine(Index < index_size);
-            //checkSlow(NextIndex[Index] != Index); // check for corrupt tables
-            //Console.WriteLine("Corrupt Tables? [" + (next_index[Index] != Index) + "]");
+            Debug.Assert(Index < indexSize);
+            Debug.Assert(nextIndex[Index] != 0, "Corrupt Tables"); // check for corrupt tables
             return nextIndex[Index];
         }
 

@@ -1,7 +1,7 @@
 ﻿using System.Collections.Concurrent;
 using System.Collections.Generic;
 
-namespace VirtualMeshCreator.Utility
+namespace VirtualMeshCreator.IO
 {
     public class MemoryPool
     {
@@ -14,7 +14,7 @@ namespace VirtualMeshCreator.Utility
 
         public LinkedListNode<int> RentNode(int value)
         {
-            if (pool.TryTake(out var node))
+            if(pool.TryTake(out var node))
             {
                 node.Value = value;
                 return node;

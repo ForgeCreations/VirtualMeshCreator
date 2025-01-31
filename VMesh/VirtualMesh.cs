@@ -11,9 +11,19 @@ namespace VirtualMeshCreator.VMesh
 {
     public struct VirtualMesh
     {
+        public VirtualMeshSettings settings {  get; set; }
+
         public Cluster[] clusters;
         public ClusterGroup[] groups;
         public int numMipLevels;
+
+        public VirtualMesh(VirtualMeshSettings settings)
+        {
+            this.settings = settings;
+            clusters = new Cluster[0];
+            groups = new ClusterGroup[0];
+            numMipLevels = 0;
+        }
 
         public void Build(ref Mesh mesh)
         {
@@ -133,7 +143,7 @@ namespace VirtualMeshCreator.VMesh
                 heap.Pop();
 
                 //check(Cluster.LODError <= MinError);
-                //Console.WriteLine(cluster.lodError <= MinError);
+                Debug.Assert(cluster.lodError <= MinError);
                 MinError = cluster.lodError;
 
                 foreach(int Child in groups[cluster.generatingGroupID].clusters)
@@ -143,9 +153,9 @@ namespace VirtualMeshCreator.VMesh
                         Cluster ChildCluster = clusters[Child];
 
                         //check(ChildCluster.MipLevel < cluster.mipLevel);
-                        //Console.WriteLine(ChildCluster.mipLevel < cluster.mipLevel);
+                        Debug.Assert(ChildCluster.mipLevel < cluster.mipLevel);
                         //check(ChildCluster.LODError <= MinError);
-                        //Console.WriteLine(ChildCluster.lodError <= MinError);
+                        Debug.Assert(ChildCluster.lodError <= MinError);
                         heap.Add(-ChildCluster.lodError, (uint)Child);
                     }
                 }
@@ -217,7 +227,7 @@ namespace VirtualMeshCreator.VMesh
                 int i = 0;
                 foreach(Cluster cluster in clusters)
                 {
-                    int ofs = 4 + 20 * i;
+                    int Offset = 4 + 20 * i;
                     //PackedData[Offset + 1] = PackedData.Length;
                     foreach(Vector3 p in cluster.vertices)
                     {
@@ -233,10 +243,9 @@ namespace VirtualMeshCreator.VMesh
                         int i0 = cluster.triangles[t * 3];
                         int i1 = cluster.triangles[t * 3 + 1];
                         int i2 = cluster.triangles[t * 3 + 2];
-                        //assert(i0 < 256 && i1 < 256 && i2 < 256);
-                        //Console.WriteLine(i0 < 256 && i1 < 256 && i2 < 256);
+                        Debug.Assert(i0 < 256 && i1 < 256 && i2 < 256);
 
-                        int PackedTriangle = i0 | (i1 << 8) | (i2 << 16);
+                        uint PackedTriangle = (uint)(i0 | (i1 << 8) | (i2 << 16));
                         writer.Write(PackedTriangle);
                     }
                     i++;

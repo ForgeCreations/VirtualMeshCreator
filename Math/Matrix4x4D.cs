@@ -1,33 +1,29 @@
-﻿using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
+﻿using System.Linq;
 
 namespace VirtualMeshCreator.Math
 {
-    public struct DMatrix4x4
+    public struct Matrix4x4D
     {
-        public DVector4[] column;
+        public Vector4D[] column;
 
-        public DMatrix4x4(int size)
+        public Matrix4x4D(int size)
         {
-            column = new DVector4[size];
+            column = new Vector4D[size];
         }
 
-        public DMatrix4x4 SetColumn(int idx, DVector4 c)
+        public Matrix4x4D SetColumn(int idx, Vector4D c)
         {
             column[idx] = c;
             return this;
         }
         
-        public DMatrix4x4 SetRow(int idx, DVector4 c)
+        public Matrix4x4D SetRow(int idx, Vector4D c)
         {
             column[idx] = c;
             return this;
         }
 
-        public bool Invert(DMatrix4x4 mat, DMatrix4x4 inv)
+        public bool Invert(Matrix4x4D mat, Matrix4x4D inv)
         {
             double[] matData = new double[0];
             for(int i = 0; i < mat.column.Length; i++)

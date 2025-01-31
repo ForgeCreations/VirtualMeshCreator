@@ -1,6 +1,6 @@
 ﻿namespace VirtualMeshCreator.Math
 {
-    public struct DVector4
+    public struct Vector4D
     {
         public double x;
         public double y;
@@ -8,10 +8,8 @@
         public double w;
 
         public double magnitude => System.Math.Sqrt(x * x + y * y + z * z + w * w);
-        public double magnitudeSqr => x * x + y * y + z * z + w * w;
-        public DVector4 normalized => new DVector4(x / magnitude, y / magnitude, z / magnitude, w / magnitude);
 
-        public DVector4(double x, double y, double z, double w)
+        public Vector4D(double x, double y, double z, double w)
         {
             this.x = x;
             this.y = y;

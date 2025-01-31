@@ -9,30 +9,30 @@ namespace VirtualMeshCreator.Utility
     {
         public static void Swap(IList<int> list, int indexA, int indexB)
         {
-            int temp = list[indexA];
-            list[indexA] = list[indexB];
-            list[indexB] = temp;
+            (list[indexA], list[indexB]) = (list[indexB], list[indexA]);
         }
 
         public static void Swap(IList<uint> list, int indexA, int indexB)
         {
-            uint temp = list[indexA];
-            list[indexA] = list[indexB];
-            list[indexB] = temp;
+            (list[indexA], list[indexB]) = (list[indexB], list[indexA]);
         }
 
         public static void Swap(ref uint a, ref uint b)
         {
-            uint temp = a;
-            a = b;
-            b = temp;
+            (b, a) = (a, b);
         }
 
-        public static void Swap(ref Vector3 a, ref Vector3 b)
+        internal static uint[] Add(this IList<uint> arr, uint[] vals)
         {
-            Vector3 temp = a;
-            a = b;
-            b = temp;
+            uint[] temp = arr.ToArray();
+            for(int i = 0; i < arr.Count - 1; i++)
+            {
+                for(int j = 0; i < vals.Length; j++)
+                {
+                    temp[i] = arr[i] + vals[i];
+                }
+            }
+            return temp;
         }
 
         internal static int[] Subtract(uint[] array1, uint[] array2)
@@ -43,6 +43,16 @@ namespace VirtualMeshCreator.Utility
                 newFinal[i] = (int)(array1[i] - array2[i]);
             }
             return newFinal;
+        }
+
+        internal static uint[] Multiply(this IList<uint> arr, uint val)
+        {
+            uint[] temp = arr.ToArray();
+            for(int i = 0; i < arr.Count() - 1; i++)
+            {
+                temp[i] = arr[i] * val;
+            }
+            return temp;
         }
 
         public static void Fill<T>(this T[] array, T value)

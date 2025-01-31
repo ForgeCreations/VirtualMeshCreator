@@ -4,6 +4,7 @@ namespace VirtualMeshCreator.IO
 {
     public static class Compression
     {
+        #region LZ Compression
         internal static byte[] LZCompress(byte[] data)
         {
             List<byte> compressedData = new List<byte>();
@@ -81,5 +82,14 @@ namespace VirtualMeshCreator.IO
 
             return decompressedData.ToArray();
         }
+        #endregion
+
+        #region BCC Compression
+
+        #endregion
+
+        #region ECT5 Compression
+
+        #endregion
     }
 }

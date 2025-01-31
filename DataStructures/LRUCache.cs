@@ -1,11 +1,10 @@
-﻿using System.Collections.Concurrent;
-using System.Collections.Generic;
+﻿using System.Collections.Generic;
 
 namespace VirtualMeshCreator.Utility
 {
     public class LRUCache<TKey, TValue>
     {
-        private class CacheItem
+        private readonly struct CacheItem
         {
             public TKey Key { get; }
             public TValue Value { get; }
@@ -18,13 +17,13 @@ namespace VirtualMeshCreator.Utility
         }
 
         private readonly int capacity;
-        private readonly Dictionary<TKey, LinkedListNode<CacheItem>> cacheMap;
+        private readonly SortedArray<TKey, LinkedListNode<CacheItem>> cacheMap;
         private readonly LinkedList<CacheItem> cacheList;
 
         public LRUCache(int capacity)
         {
             this.capacity = capacity;
-            cacheMap = new Dictionary<TKey, LinkedListNode<CacheItem>>(capacity);
+            cacheMap = new SortedArray<TKey, LinkedListNode<CacheItem>>(capacity);
             cacheList = new LinkedList<CacheItem>();
         }
 

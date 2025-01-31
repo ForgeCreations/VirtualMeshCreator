@@ -55,15 +55,15 @@ namespace VirtualMeshCreator.Math
 
         public static int Clamp(int x, int min, int max)
         {
-            if (x < min) return min;
-            if (x > max) return max;
+            if(x < min) return min;
+            if(x > max) return max;
             return x;
         }
 
         public static uint Clamp(uint x, uint min, uint max)
         {
-            if (x < min) return min;
-            if (x > max) return max;
+            if(x < min) return min;
+            if(x > max) return max;
             return x;
         }
     }

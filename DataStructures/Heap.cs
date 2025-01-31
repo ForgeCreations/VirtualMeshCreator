@@ -28,6 +28,11 @@ namespace VirtualMeshCreator.VMesh
             heap_indexes = new uint[numIndex];
         }
 
+        ~Heap()
+        {
+            Dispose();
+        }
+
         private void PushUp(uint i)
         {
             uint idx = heap[i];
@@ -145,7 +150,7 @@ namespace VirtualMeshCreator.VMesh
 
         private void Swap(int offset, int index1, int index2)
         {
-            var temp = heap[offset + index1];
+            uint temp = heap[offset + index1];
             heap[offset + index1] = heap[offset + index2];
             heap[offset + index2] = temp;
         }

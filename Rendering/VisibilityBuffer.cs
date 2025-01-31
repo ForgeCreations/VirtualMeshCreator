@@ -1,20 +1,37 @@
-﻿using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Threading.Tasks;
-
-namespace VirtualMeshCreator.Rendering
+﻿namespace VirtualMeshCreator.Rendering
 {
-    public class VisibilityBuffer
+    public readonly struct VisibilityBuffer
     {
-        /// <summary>
-        /// Data = 32 bits: Depth, 17 bits: Visible Cluster ID, 8 bits: Triangle ID
-        /// </summary>
-        public ulong[,] Data;
+        public int[,] ObjectIDs { get; }
+        public float[,] Depths { get; }
 
         public VisibilityBuffer(int width, int height)
         {
-            Data = new ulong[width, height];
+            ObjectIDs = new int[width, height];
+            Depths = new float[width, height];
+
+            for(int y = 0; y < height; y++)
+            {
+                for(int x = 0; x < width; x++)
+                {
+                    ObjectIDs[x, y] = -1;
+                    Depths[x, y] = float.MaxValue;
+                }
+            }
+        }
+
+        public void SetVisibility(int x, int y, int objectId, float depth)
+        {
+            if(depth < Depths[x, y])
+            {
+                ObjectIDs[x, y] = objectId;
+                Depths[x, y] = depth;
+            }
+        }
+
+        public bool IsVisible(int x, int y, float depth)
+        {
+            return depth < Depths[x, y];
         }
     }
 }

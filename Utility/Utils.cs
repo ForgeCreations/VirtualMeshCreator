@@ -1,25 +1,19 @@
-﻿using System;
-using System.Collections.Generic;
+﻿using System.Collections.Generic;
 
 namespace VirtualMeshCreator.Utility
 {
     public class Utils
     {
-        public static KeyValuePair<uint, uint> Find(Dictionary<uint, uint> dictionary, uint key, KeyValuePair<uint, uint> defaultValue = default)
-        {
-            foreach(KeyValuePair<uint, uint> kv in dictionary)
-            {
-                if(kv.Key == key)
-                {
-                    return kv;
-                }
-            }
-            return defaultValue;
-        }
-
-        public static bool KVEquals(KeyValuePair<uint, uint> a, KeyValuePair<uint, uint> b)
+        public static bool PairEquals(Pair<uint, uint> a, Pair<uint, uint> b)
         {
             if(a.Key == b.Key && a.Value == b.Value)
+                return true;
+            return false;
+        }
+
+        public static bool KVPairEquals(KeyValuePair<uint, uint> a, KeyValuePair<uint, uint> b)
+        {
+            if (a.Key == b.Key && a.Value == b.Value)
                 return true;
             return false;
         }
